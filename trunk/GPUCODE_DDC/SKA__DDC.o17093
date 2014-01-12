@@ -1,0 +1,24 @@
+Script started at Wed Jan 8 14:09:32 SAST 2014
+
+Running on: srvslsgpu001
+-----------------------------------------------------------------------
+Actual lo freq is: 219921872.000000 MHz (1126, 4096, 800000000, 220000000)
+Producing 6553600 output samples per block (40960000 samples).
+Using 128 tap FIR filter.
+Preparing sin lookup table...
+Allocating block storage on GPU...
+Copying FIR taps and SIN lookup table to GPU...
+GPU Configuration: blocks per grid: 40000, threads per block: 1024
+Read 40960000 bytes of data...
+Loop 0 (start: 0).
+Expanded: Char buffer value 0 is 0
+Expanded: Char buffer value 1 is 0
+Expanded: Char buffer value 2 is 0
+Expanded: Char buffer value 3 is 9
+Expanded: Char buffer value 4 is 10
+Expanded: Char buffer value 5 is -12
+Expanded: Char buffer value 6 is -7
+Expanded: Char buffer value 7 is 13
+Expanded: Char buffer value 8 is 5
+Expanded: Char buffer value 9 is -14
+Loop done. CUDA time is 34.353889 ms
