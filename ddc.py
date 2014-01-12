@@ -7,7 +7,7 @@ Created on Jan 10, 2014
 import numpy as np
 import scipy.signal
 from pylab import *
-
+from struct import pack
 '''
    ____                       _               
   / __ \                     (_)              
@@ -72,6 +72,10 @@ decimationFactor = 3
 numTaps = 128
 cutoffFreq = 120e6 #at shifted highest freq
 
+dumpGeneratedTone = False
+dumpGeneratedToneFilename = "pytone.dat"
+dumpDecimatedOutput = True
+dumpDecimatedOutputFilename = "pydecimated.dat"
 '''
   _______                  _____                           _
  |__   __|                / ____|                         | | (_)            
@@ -114,6 +118,14 @@ tone = np.zeros(numSamples)
 for i in toneInterval:
     tone += scaleFactor * sinTable[(n*i) % lookupTableSize]
 tone = tone.astype(np.int8) #cast to 8bit integer samples
+
+if dumpGeneratedTone:
+	print "Dumping generated tone"
+	s = "".join([pack('b',x) for x in tone])
+	f = open(dumpGeneratedToneFilename,"w")
+	f.write(s)
+	f.close()
+
 '''
 generate lo tone
 '''
@@ -133,6 +145,7 @@ cos_lo_n = sinTable[((lookupTableSize / 4) + n*LOInterval) % lookupTableSize]
  with lo as its frequency. We have to rescale one of the signals down into floating point space before multiplication
  otherwise we may overflow the 8bit sample sizes
 '''
+print "Mixing"
 iMix = (cos_lo_n/127.0 * tone).astype(np.int8) 
 qMix = (sin_lo_n/127.0 * tone).astype(np.int8) 
 
@@ -147,6 +160,7 @@ qMix = (sin_lo_n/127.0 * tone).astype(np.int8)
                                                |___/                                                                                         
 Creates a lowpass FIR filter to filter at the shifted highest frequency
 '''
+print "Generating filter"
 firFilter = scipy.signal.firwin(numTaps, cutoffFreq/nRate)
 
 '''
@@ -162,6 +176,7 @@ sum_(i = 0)^(numSamples-1)(x[y-i]h[i]) for each output sample index y. However, 
 only have to do this for the samples we are not discarding in the decimation process.
 Therefore we convolve in steps of the decimation factor.
 '''
+print "Convolving and decimating"
 dec_filter_out = np.zeros(ceil(numSamples/float(decimationFactor)), dtype=np.int8)
 for i in range(0,numSamples,decimationFactor):
   outval = 0
@@ -170,7 +185,12 @@ for i in range(0,numSamples,decimationFactor):
     outval += tap * iMix[idx] if idx >= 0 else 0 #takes care of the first taps-1 samples edge case 
   dec_filter_out[i/decimationFactor] = outval
 
-#dec_filter_out = (filter_out).astype(np.int8)[::decimationFactor]
+if dumpDecimatedOutput:
+	print "Dumping decimated mix"
+	s = "".join([pack('b',x) for x in dec_filter_out])
+	f = open(dumpDecimatedOutputFilename,"w")
+	f.write(s)
+	f.close()
 
 '''
         _       _       
@@ -217,7 +237,7 @@ xlabel("Frequency (MHz)")
 
 figure(4)
 title("Scaled FFT of filtered and decimated iMix")
-plot(freq[:0.5*numFourierSamples] / decimationFactor, abs(np.imag(np.fft.fft(dec_filter_out, numFourierSamples)))[:0.5*numFourierSamples] / numSamples)
+plot(freq[:0.5*numFourierSamples] / decimationFactor, abs(np.real(np.fft.fft(dec_filter_out, numFourierSamples)))[:0.5*numFourierSamples] / numSamples / decimationFactor)
 xlabel("Frequency (MHz)")
 show()
 

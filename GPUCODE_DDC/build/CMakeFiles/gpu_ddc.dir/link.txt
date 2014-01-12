@@ -1,1 +1,1 @@
-/usr/bin/c++    -fopenmp -O3 -DNDEBUG    CMakeFiles/gpu_ddc.dir/./gpu_ddc_generated_ddc.cu.o  -o gpu_ddc -rdynamic /usr/local/cuda/lib64/libcudart.so -lgomp -Wl,-rpath,/usr/local/cuda/lib64: 
+/usr/bin/c++    -fopenmp -O3 -DNDEBUG    CMakeFiles/gpu_ddc.dir/./gpu_ddc_generated_ddc.cu.o  -o gpu_ddc -rdynamic /usr/local/cuda/lib64/libcudart.so -lcuda -lgomp -Wl,-rpath,/usr/local/cuda/lib64: 

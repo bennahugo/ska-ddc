@@ -56,18 +56,18 @@ endif()
 
 # Set these up as variables to make reading the generated file easier
 set(CMAKE_COMMAND "/usr/bin/cmake") # path
-set(source_file "/home/bhugo/GPUCODE_DDC/ddc.cu") # path
-set(NVCC_generated_dependency_file "/home/bhugo/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//gpu_ddc_generated_ddc.cu.o.NVCC-depend") # path
-set(cmake_dependency_file "/home/bhugo/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//gpu_ddc_generated_ddc.cu.o.depend") # path
-set(CUDA_make2cmake "/usr/share/cmake/Modules/FindCUDA/make2cmake.cmake") # path
-set(CUDA_parse_cubin "/usr/share/cmake/Modules/FindCUDA/parse_cubin.cmake") # path
+set(source_file "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/ddc.cu") # path
+set(NVCC_generated_dependency_file "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//gpu_ddc_generated_ddc.cu.o.NVCC-depend") # path
+set(cmake_dependency_file "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//gpu_ddc_generated_ddc.cu.o.depend") # path
+set(CUDA_make2cmake "/usr/share/cmake-2.8/Modules/FindCUDA/make2cmake.cmake") # path
+set(CUDA_parse_cubin "/usr/share/cmake-2.8/Modules/FindCUDA/parse_cubin.cmake") # path
 set(build_cubin OFF) # bool
 set(CUDA_HOST_COMPILER "/usr/bin/cc") # bool
 # We won't actually use these variables for now, but we need to set this, in
 # order to force this file to be run again if it changes.
-set(generated_file_path "/home/bhugo/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//.") # path
-set(generated_file_internal "/home/bhugo/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//./gpu_ddc_generated_ddc.cu.o") # path
-set(generated_cubin_file_internal "/home/bhugo/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//./gpu_ddc_generated_ddc.cu.o.cubin.txt") # path
+set(generated_file_path "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//.") # path
+set(generated_file_internal "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//./gpu_ddc_generated_ddc.cu.o") # path
+set(generated_cubin_file_internal "/home/benjamin/Documents/ska-ddc/GPUCODE_DDC/build/CMakeFiles/gpu_ddc.dir//./gpu_ddc_generated_ddc.cu.o.cubin.txt") # path
 
 set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda/bin/nvcc") # path
 set(CUDA_NVCC_FLAGS -O3 -Xcompiler -fopenmp -gencode arch=compute_20,code=sm_20 -gencode arch=compute_20,code=sm_21 -gencode arch=compute_30,code=sm_30 ;; ) # list
@@ -169,7 +169,7 @@ cuda_execute_process(
 # For CUDA 2.3 and below, -G -M doesn't work, so remove the -G flag
 # for dependency generation and hope for the best.
 set(depends_CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
-set(CUDA_VERSION 5.0)
+set(CUDA_VERSION 5.5)
 if(CUDA_VERSION VERSION_LESS "3.0")
   cmake_policy(PUSH)
   # CMake policy 0007 NEW states that empty list elements are not
