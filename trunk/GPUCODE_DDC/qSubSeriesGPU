@@ -18,4 +18,4 @@ echo "Script started at "$(date)
 echo ""
 echo "Running on: $(hostname)"
 echo "-----------------------------------------------------------------------"
-/home/bhugo/ska-ddc/GPUCODE_DDC/build/gpu_ddc /home/bhugo/ska-ddc/GPUCODE_DDC/pytone.dat /home/bhugo/ska-ddc/GPUCODE_DDC/fir_16m_128tap.dat /home/bhugo/ska-ddc/GPUCODE_DDC/output.dump
+/home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/build/gpu_ddc /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/pytone.dat /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/fir_16m_128tap.dat /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/output.dump

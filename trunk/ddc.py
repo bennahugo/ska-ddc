@@ -60,22 +60,26 @@ This is possible because in convolution each output value does not depend on any
 '''
 samplingRate = 800e6 #this should be at least double the highest frequency
 nRate = 0.5 * samplingRate #nyquest sampling rate
-numSamples = 4096
+numSamples = 4096 * 2
 numFourierSamples = 4096
 lookupTableSize = 4096 #size of the sin lookup table
 
-LO_freq = 200e6
-toneFreq = [210e6,250e6,320e6] #create a tone consisting of multiple frequencies
+LO_freq = 220e6
+toneFreq = [225e6,250e6] #create a tone consisting of multiple frequencies
 
-decimationFactor = 3
+decimationFactor = 25
+upsample = 4
 #filter design coefficients
 numTaps = 128
-cutoffFreq = 120e6 #at shifted highest freq
+cutoffFreq =  0.5 * samplingRate * upsample / decimationFactor
 
 dumpGeneratedTone = False
 dumpGeneratedToneFilename = "pytone.dat"
 dumpDecimatedOutput = True
 dumpDecimatedOutputFilename = "pydecimated.dat"
+exitAfterToneDump = False
+exitAfterDecimation = False
+
 '''
   _______                  _____                           _
  |__   __|                / ____|                         | | (_)            
@@ -125,7 +129,9 @@ if dumpGeneratedTone:
 	f = open(dumpGeneratedToneFilename,"w")
 	f.write(s)
 	f.close()
-
+if exitAfterToneDump:
+	print "TONE DUMPED, EXITING"
+	sys.exit(0)
 '''
 generate lo tone
 '''
@@ -176,13 +182,16 @@ sum_(i = 0)^(numSamples-1)(x[y-i]h[i]) for each output sample index y. However, 
 only have to do this for the samples we are not discarding in the decimation process.
 Therefore we convolve in steps of the decimation factor.
 '''
-print "Convolving and decimating"
-dec_filter_out = np.zeros(ceil(numSamples/float(decimationFactor)), dtype=np.int8)
-for i in range(0,numSamples,decimationFactor):
+print "Upsampling"
+upsample_out = np.zeros(numSamples * upsample)
+upsample_out[::upsample] = iMix
+print "Decimating and filtering"
+dec_filter_out = np.zeros(numSamples * upsample / decimationFactor + 1, dtype=np.int8)
+for i in range(0,numSamples * upsample,decimationFactor):
   outval = 0
   for j,tap in enumerate(firFilter):
     idx = i - j
-    outval += tap * iMix[idx] if idx >= 0 else 0 #takes care of the first taps-1 samples edge case 
+    outval += tap * upsample_out[idx] if idx >= 0 else 0 #takes care of the first taps-1 samples edge case 
   dec_filter_out[i/decimationFactor] = outval
 
 if dumpDecimatedOutput:
@@ -191,7 +200,9 @@ if dumpDecimatedOutput:
 	f = open(dumpDecimatedOutputFilename,"w")
 	f.write(s)
 	f.close()
-
+if exitAfterDecimation:
+	print "DECIMATION COMPLETED, EXITING"
+	sys.exit(0)
 '''
         _       _       
        | |     | |      
@@ -237,7 +248,7 @@ xlabel("Frequency (MHz)")
 
 figure(4)
 title("Scaled FFT of filtered and decimated iMix")
-plot(freq[:0.5*numFourierSamples] / decimationFactor, abs(np.real(np.fft.fft(dec_filter_out, numFourierSamples)))[:0.5*numFourierSamples] / numSamples / decimationFactor)
+plot(freq[:0.5*numFourierSamples] * upsample / decimationFactor, abs(np.real(np.fft.fft(dec_filter_out, numFourierSamples)))[:0.5*numFourierSamples] / (numSamples * upsample / decimationFactor))
 xlabel("Frequency (MHz)")
 show()
 
