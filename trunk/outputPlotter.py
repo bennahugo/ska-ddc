@@ -3,20 +3,18 @@ import scipy.signal
 from pylab import *
 from struct import unpack
 
+if len(sys.argv) != 3:
+    print "Please supply command arguements: 'numSamples' 'input filename'"
+    sys.exit(1)
+
 samplingRate = 800e6 #this should be at least double the highest frequency
-numSamples = 4096 * 2 
+numSamples = int(sys.argv[1])
 decimationFactor = 25
 interpFactor = 4
 numFourierSamples = 4096
-
-numSamples = numSamples * interpFactor / decimationFactor
-
-if len(sys.argv) < 2:
-    print "Please supply command arguements: input filename"
-    sys.exit(1)
     
 #unpack from byte stream:
-f = open(sys.argv[1],"r")
+f = open(sys.argv[2],"r")
 s = f.read()
 f.close()
 dec_filter_out = np.zeros(len(s))

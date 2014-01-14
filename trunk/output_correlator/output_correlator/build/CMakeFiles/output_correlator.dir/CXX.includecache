@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/benjamin/remoteserv/ska-res/ska-ddc/output_correlator/output_correlator/main.cpp
+iostream
+-
+stdint.h
+-
+cstdio
+-
+cstdlib
+-
+assert.h
+-
+omp.h
+-
+timer.h
+/home/benjamin/remoteserv/ska-res/ska-ddc/output_correlator/output_correlator/timer.h
+
+/home/benjamin/remoteserv/ska-res/ska-ddc/output_correlator/output_correlator/timer.h
+time.h
+-
+

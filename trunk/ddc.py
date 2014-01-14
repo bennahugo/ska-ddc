@@ -60,7 +60,7 @@ This is possible because in convolution each output value does not depend on any
 '''
 samplingRate = 800e6 #this should be at least double the highest frequency
 nRate = 0.5 * samplingRate #nyquest sampling rate
-numSamples = 4096 * 2
+numSamples = 4096
 numFourierSamples = 4096
 lookupTableSize = 4096 #size of the sin lookup table
 
@@ -73,12 +73,12 @@ upsample = 4
 numTaps = 128
 cutoffFreq =  0.5 * samplingRate * upsample / decimationFactor
 
-dumpGeneratedTone = False
+dumpGeneratedTone = True
 dumpGeneratedToneFilename = "pytone.dat"
 dumpDecimatedOutput = True
 dumpDecimatedOutputFilename = "pydecimated.dat"
 exitAfterToneDump = False
-exitAfterDecimation = False
+exitAfterDecimation = True
 
 '''
   _______                  _____                           _
@@ -188,6 +188,8 @@ upsample_out[::upsample] = iMix
 print "Decimating and filtering"
 dec_filter_out = np.zeros(numSamples * upsample / decimationFactor + 1, dtype=np.int8)
 for i in range(0,numSamples * upsample,decimationFactor):
+  if i % int((numSamples * upsample)*0.01) == i / (numSamples * upsample):
+    print "DECIMATION AT ",i / float(numSamples * upsample) * 100.0,"%"
   outval = 0
   for j,tap in enumerate(firFilter):
     idx = i - j
@@ -195,7 +197,7 @@ for i in range(0,numSamples * upsample,decimationFactor):
   dec_filter_out[i/decimationFactor] = outval
 
 if dumpDecimatedOutput:
-	print "Dumping decimated mix"
+	print "Dumping decimated mix of",len(dec_filter_out),"samples"
 	s = "".join([pack('b',x) for x in dec_filter_out])
 	f = open(dumpDecimatedOutputFilename,"w")
 	f.write(s)

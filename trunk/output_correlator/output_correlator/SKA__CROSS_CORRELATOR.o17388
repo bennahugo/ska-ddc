@@ -1,0 +1,9 @@
+Script started at Tue Jan 14 13:20:30 SAST 2014
+
+Running on: srvslsgpu001
+-----------------------------------------------------------------------
+Streams '/home/bhugo/ska-res/ska-ddc/pydecimated4096e4_to_25_over_4.dat' and '/home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/output.dump' of size 6553600 read successfully
+Starting parallel cross correlation with 16 threads
+Completed parallel cross correlation in 3.756841 seconds
+Stream '/home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/output.dump' offset from stream '/home/bhugo/ska-res/ska-ddc/pydecimated4096e4_to_25_over_4.dat' by 983 samples
+Program terminated normally

@@ -2,42 +2,47 @@ import numpy as np
 import scipy.signal
 from pylab import *
 from struct import unpack
+from struct import pack
+
+if len(sys.argv) != 4:
+    print "Please supply command arguements: 'No. Samples' 'signal1 filename' 'signal2 filename'"
+    sys.exit(1)
 
 samplingRate = 800e6 #this should be at least double the highest frequency
-numSamples = 4096 * 2 
+numSamples = int(sys.argv[1]) 
 decimationFactor = 25
 interpFactor = 4
 numFourierSamples = 4096
-numSamples = numSamples * interpFactor / decimationFactor
 
 plotOff = False
-debugShift = 50
-
-
-if len(sys.argv) != 3:
-    print "Please supply command arguements: 'signal1 filename' 'signal2 filename'"
-    sys.exit(1)
+dumpShiftedTone = True
+debugShift = 10
     
 #unpack from byte stream:
-f = open(sys.argv[1],"r")
+f = open(sys.argv[2],"r")
 s = f.read()
 f.close()
 signal1 = np.zeros(len(s))
 for i,c in enumerate(s):
 	signal1[i] = unpack('b',c)[0]
 
-f = open(sys.argv[1],"r")
+f = open(sys.argv[3],"r")
 s = f.read()
 f.close()
 signal2 = np.zeros(len(s))
 for i,c in enumerate(s):
 	signal2[i] = unpack('b',c)[0]
-'''
-debug sanity check
+
+#debug sanity check
 signal3 = np.zeros(numSamples)
 for i in range(debugShift,numSamples):
   signal3[i-debugShift] = signal2[i]
-'''
+if dumpShiftedTone:
+  print "Dumping shifted tone"
+  s = "".join([pack('b',x) for x in signal3])
+  f = open("shiftedTone.dat","w")
+  f.write(s)
+  f.close()
 
 correlated = np.zeros(numSamples + 1)
 maxV = 0
