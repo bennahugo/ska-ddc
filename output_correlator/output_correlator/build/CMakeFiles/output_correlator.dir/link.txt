@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -m64 -O3 -fopenmp -g    CMakeFiles/output_correlator.dir/timer.o CMakeFiles/output_correlator.dir/main.o  -o output_correlator -rdynamic -lrt -lgomp 

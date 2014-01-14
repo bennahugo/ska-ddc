@@ -1,0 +1,4 @@
+[Project]
+Name=output_correlator
+Manager=KDevCMakeManager
+VersionControl=
