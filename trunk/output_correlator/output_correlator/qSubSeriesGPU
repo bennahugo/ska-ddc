@@ -3,7 +3,7 @@
 # This is an example script
 #
 #These commands set up the Grid Environment for your job:
-#PBS -N SKA__CROSS_CORRELATOR
+#PBS -N XCORRELATOR
 #PBS -l nodes=1:ppn=16:seriesGPU,walltime=24:00:00
 #PBS -q GPUQ
 #

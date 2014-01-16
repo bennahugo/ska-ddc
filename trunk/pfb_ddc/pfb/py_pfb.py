@@ -1,10 +1,14 @@
 #!/usr/bin/python
+
+#this supposedly simulates a fake F engine
+#TODO: write code to undo what this fake F engine does
+
 from pylab import *
 from struct import unpack
 import sys
 import scipy.signal
 
-block_size = 1024*1024
+block_size = 4096
  # size of block to operate on each loop
 loops = 1
 N = 512
@@ -14,10 +18,12 @@ P=8
 if len(sys.argv) < 2:
     print "Please supply an input raw voltage file."
     sys.exit(1)
-
-h0 = scipy.signal.firwin(P * N, 1. / N)
-p = N * np.flipud(h0.reshape(P, N))
  # generate taps
+h0 = scipy.signal.firwin(P * N, 1. / N)
+
+
+p = N * np.flipud(h0.reshape(P, N))
+
 
 f = open(sys.argv[1],"r")
 s = f.read(loops * block_size)
