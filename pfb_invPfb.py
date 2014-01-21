@@ -14,7 +14,10 @@ N = 512 #no. FFT samples
 P = 8 #no. subfilters in the bank
 window_length = N * P #length of the hamming window
 no_bins = N / 2 #real FFTs mirror half the bins
-tone_freq = [0.1e6]#max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.5)] 
+#tone_freq = [max_freq / float(no_bins) * (100)]
+#tone_freq = [max_freq / float(no_bins) * (150.3)]
+#tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150)] 
+tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.45)] 
 no_samples = window_length*6 #number of samples should hopefully be a multiple of the window length  
 pad = N*P #pad the tone
 
@@ -34,7 +37,6 @@ FORWARD PFB
 '''
 #setup the windowing function
 w = scipy.signal.firwin(P * N, 1. / N).reshape(P, N)
-#w = np.ones(P*N).reshape(P,N)
 
 #filter with the filterbank
 pfb_input = np.zeros(no_samples + pad).astype(np.complex64)
@@ -60,10 +62,7 @@ INVERSE PFB
 '''
 #setup the inverse windowing function
 #w_i = (scipy.signal.firwin(P * N, 1. / N)[::-1]).reshape(P, N)
-w_i = w
-
-
-
+w_i = w # filter is semetrical, so there should not be a difference if we flip it or not
 
 
 len_of_valid_pfb_output = no_samples - pad
@@ -83,7 +82,7 @@ for lB in range(0,no_samples,N):
 for lB in range(0,len_of_valid_pfb_output,N):
     pfb_inverse_output[lB:lB+N] = np.fliplr(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
 
-#xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone[0:len_of_valid_pfb_output-pad])
+xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone[0:len_of_valid_pfb_output-pad])
 
 
 '''
@@ -145,7 +144,22 @@ axvline(x=pad,linewidth=2, color='r')
 for x in range(N, len_of_valid_pfb_output-pad,N):
     axvline(x=pad + x,linewidth=1, color='g')
 
-# figure(5)
-# plot(xCor)
+
+num_fourier_samples = len_of_valid_pfb_output-pad
+fft_pfb_inv_output = np.fft.fft(pfb_inverse_output[pad:])[0:num_fourier_samples/2]
+
+figure(5)
+subplot(211)
+title("FFT.r of inverse pfb")
+plot(np.arange(0,sampling_freq,sampling_freq/num_fourier_samples)[0:num_fourier_samples/2]/1.0e6,np.abs(np.real(fft_pfb_inv_output))[0:num_fourier_samples/2])
+subplot(212)
+title("FFT.i of inverse pfb")
+plot(np.arange(0,sampling_freq,sampling_freq/num_fourier_samples)[0:num_fourier_samples/2]/1.0e6,np.abs(np.imag(fft_pfb_inv_output))[0:num_fourier_samples/2])
+xlabel("F (MHz)")
+
+figure(6)
+title("X correlation between tone and pfb^(-1)")
+plot(xCor)
+xlabel("Sample number")
 show()
 
