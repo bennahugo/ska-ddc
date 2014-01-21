@@ -13,9 +13,9 @@ max_freq = 0.5 * sampling_freq
 N = 512 #no. FFT samples
 P = 8 #no. subfilters in the bank
 window_length = N * P #length of the hamming window
-no_bins = N / 2 #TODO when generating a complex tone this should be no_bins, real FFTs mirror half the bins
-tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.5)] 
-no_samples = window_length*3 #number of samples should hopefully be a multiple of the window length  
+no_bins = N / 2 #real FFTs mirror half the bins
+tone_freq = [0.1e6]#max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.5)] 
+no_samples = window_length*6 #number of samples should hopefully be a multiple of the window length  
 pad = N*P #pad the tone
 
 '''
@@ -59,13 +59,17 @@ for lB in range(0,no_samples,N):
 INVERSE PFB
 '''
 #setup the inverse windowing function
-w_i = np.flipud(w) 
+#w_i = (scipy.signal.firwin(P * N, 1. / N)[::-1]).reshape(P, N)
+w_i = w
+
+
+
+
 
 len_of_valid_pfb_output = no_samples - pad
 pfb_inverse_input = np.zeros(len_of_valid_pfb_output + pad).astype(np.complex64)
 pfb_inverse_input[pad:pad+len_of_valid_pfb_output] = pfb_output[pad:no_samples]
 pfb_inverse_ifft_output = np.zeros(len_of_valid_pfb_output + pad).astype(np.complex64)
-pfb_inverse_output = np.zeros(len_of_valid_pfb_output).astype(np.complex64)
 pfb_inverse_output = np.zeros(len_of_valid_pfb_output).astype(np.complex64)
 
 '''
@@ -77,7 +81,10 @@ for lB in range(0,no_samples,N):
     pfb_inverse_ifft_output[lB:lB+N] = np.fft.ifft(pfb_inverse_input[lB:lB+N])
 
 for lB in range(0,len_of_valid_pfb_output,N):
-    pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
+    pfb_inverse_output[lB:lB+N] = np.fliplr(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
+
+#xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone[0:len_of_valid_pfb_output-pad])
+
 
 '''
 Plot
@@ -121,7 +128,7 @@ for x in range(N, no_samples-pad,N):
 figure(4)
 subplot(311)
 title("Inverse pfb input")
-plot(pfb_inverse_input)
+plot(np.abs(pfb_inverse_input))
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, len_of_valid_pfb_output-pad,N):
     axvline(x=pad + x,linewidth=1, color='g')
@@ -137,5 +144,8 @@ plot(pfb_inverse_output)
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, len_of_valid_pfb_output-pad,N):
     axvline(x=pad + x,linewidth=1, color='g')
+
+# figure(5)
+# plot(xCor)
 show()
 
