@@ -1,4 +1,6 @@
-reated on Jan 16, 2014
+#!/bin/usr/python
+'''
+Created on Jan 16, 2014
 
 @author: benjamin
 '''
@@ -6,69 +8,134 @@ from pylab import *
 import sys
 import scipy.signal
 
-tone_freq = [i * 1e6 for i in [110]]
 sampling_freq = 800e6
-
-N = 256 #no. FFT samples
+max_freq = 0.5 * sampling_freq 
+N = 512 #no. FFT samples
 P = 8 #no. subfilters in the bank
 window_length = N * P #length of the hamming window
-
-no_samples = window_length * 1 #number of samples should hopefully be a multiple of the window length  
+no_bins = N / 2 #TODO when generating a complex tone this should be no_bins, real FFTs mirror half the bins
+tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.5)] 
+no_samples = window_length*3 #number of samples should hopefully be a multiple of the window length  
 pad = N*P #pad the tone
 
-
 '''
-generate a fake tone and pad with N*P zeros
+generate a fake tone
 '''
-tone = np.zeros(no_samples + pad) 
+tone = np.zeros(no_samples) 
 for f in tone_freq:
     for n in np.arange(0,no_samples):
         tone[n] += np.sin(2 * np.pi * n * (f / float(sampling_freq)))
+
+for f in tone_freq:
+    print "frequency %f MHz should be in channel %f after filtering" % (f / float(1e6),f / (max_freq / float(no_bins)))
+
+'''
+FORWARD PFB
+'''
+#setup the windowing function
+w = scipy.signal.firwin(P * N, 1. / N).reshape(P, N)
+#w = np.ones(P*N).reshape(P,N)
+
+#filter with the filterbank
+pfb_input = np.zeros(no_samples + pad).astype(np.complex64)
+
+pfb_input[pad:pad+no_samples] = tone
+pfb_filtered_output = np.zeros(no_samples).astype(np.complex64)
+pfb_output = np.zeros(no_samples).astype(np.complex64)
+for lB in range(0,no_samples,N):
+    pfb_filtered_output[lB:lB+N] = ((pfb_input[lB:lB+(P*N)].reshape(P,N))*w).sum(axis=0) 
+    pfb_output[lB:lB+N] = np.fft.fft(pfb_filtered_output[lB:lB+N])
+      
+
+'''
+take Short Time FFTs without filtering for comparison
+'''
+unfiltered_output = np.zeros(no_samples).astype(np.complex64)
+for lB in range(0,no_samples,N):
+    unfiltered_output[lB:lB+N] = np.fft.fft(pfb_input[lB:lB+N])
+    
     
 '''
-generate the hamming window for leakage suppression
+INVERSE PFB
 '''
-w = np.hamming(window_length)
+#setup the inverse windowing function
+w_i = np.flipud(w) 
+
+len_of_valid_pfb_output = no_samples - pad
+pfb_inverse_input = np.zeros(len_of_valid_pfb_output + pad).astype(np.complex64)
+pfb_inverse_input[pad:pad+len_of_valid_pfb_output] = pfb_output[pad:no_samples]
+pfb_inverse_ifft_output = np.zeros(len_of_valid_pfb_output + pad).astype(np.complex64)
+pfb_inverse_output = np.zeros(len_of_valid_pfb_output).astype(np.complex64)
+pfb_inverse_output = np.zeros(len_of_valid_pfb_output).astype(np.complex64)
 
 '''
-generate the inverse hamming window for inverse pfb
+for computational efficiency invert every FFT from the forward process only once... for xx large data
+we'll need a ring buffer to store the previous IFFTs
 '''
-w_inverse = np.fliplr(w.reshape(N,P)).reshape(window_length) 
-
-'''
- "filter" N * P elements from the tone at a time, stepping through the tone by N samples
-'''
-pad = N*P
-pfb_output = np.zeros(no_samples).astype(np.complex64)
 
 for lB in range(0,no_samples,N):
-    w_out = tone[lB:(lB + window_length)] * w #element-wise multiply N*P samples with the window function
-    #element-wise accumulate each of the subfilters into one block 
-    for n in range(0,N):
-        accum = 0
-        for blockID in range(0,P):
-            accum += w_out[(n + blockID*N)]
-        pfb_output[lB+n] = accum  
-    pfb_output[lB:lB+N] = np.fft.fft(pfb_output[lB:lB+N])
+    pfb_inverse_ifft_output[lB:lB+N] = np.fft.ifft(pfb_inverse_input[lB:lB+N])
+
+for lB in range(0,len_of_valid_pfb_output,N):
+    pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
 
 '''
 Plot
 '''
 figure(1)
 subplot(211)
-title("Tone")
-plot(tone)
+title("Unfiltered Short time fast fourier transforms")
+plot(pfb_input)
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, no_samples-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+    
 subplot(212)
-plot(np.arange(0,sampling_freq,sampling_freq/no_samples) / 1.0e6,np.abs(np.imag(np.fft.fft(tone[0:no_samples]))))
+plot(np.abs(unfiltered_output))
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, no_samples-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+    
+    
 figure(2)
 subplot(211)
 title("Hamming window")
-plot(w)
+plot(w.reshape(P*N))
 subplot(212)
-title("Hamming window with subfilters flipped")
-plot(w_inverse)
-
+title("inverse window")
+plot(w_i.reshape(P*N))
+  
 figure(3)
-title("PFB output")
-plot(np.imag(pfb_output))
+subplot(211)
+title("Filtered Short time fast fourier transforms")
+plot(pfb_filtered_output)
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, no_samples-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+subplot(212)
+plot(np.abs(pfb_output))
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, no_samples-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+
+figure(4)
+subplot(311)
+title("Inverse pfb input")
+plot(pfb_inverse_input)
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, len_of_valid_pfb_output-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+subplot(312)
+title("Short time IFFTs of inverse pfb input")
+plot(pfb_inverse_ifft_output)
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, len_of_valid_pfb_output-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
+subplot(313)
+title("Inverse pfb output")
+plot(pfb_inverse_output)
+axvline(x=pad,linewidth=2, color='r')
+for x in range(N, len_of_valid_pfb_output-pad,N):
+    axvline(x=pad + x,linewidth=1, color='g')
 show()
+
