@@ -10,31 +10,43 @@ import scipy.signal
 
 sampling_freq = 800e6
 max_freq = 0.5 * sampling_freq 
-N = 512 #no. FFT samples
-P = 8 #no. subfilters in the bank
+N = 512 #no. SFFT samples
+P = 8  #no. subfilters in the bank
 window_length = N * P #length of the hamming window
 no_bins = N / 2 #real FFTs mirror half the bins
 #tone_freq = [max_freq / float(no_bins) * (100)]
-#tone_freq = [max_freq / float(no_bins) * (150.3)]
-#tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150)] 
-tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.45)] 
-no_samples = window_length*6 #number of samples should hopefully be a multiple of the window length  
+tone_freq = [max_freq / float(no_bins) * (150.3)]
+#tone_freq = [max_freq / float(no_bins) * (100.0),max_freq / float(no_bins) * (150.0)] 
+#tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.45)] 
+impulse_shift = N*P + 0.25*N
+tone_generation_mode = "sine" #toggle between using a sinusoidal tone @ tone_freq OR generating gausian noise OR impulse (shifted delta)
+should_compute_auto_correlate = False
+should_x_correlate = True
+no_samples = window_length*10   
 pad = N*P #pad the tone
 
 '''
 generate a fake tone
 '''
-tone = np.zeros(no_samples) 
-for f in tone_freq:
-    for n in np.arange(0,no_samples):
-        tone[n] += np.sin(2 * np.pi * n * (f / float(sampling_freq)))
-
-for f in tone_freq:
-    print "frequency %f MHz should be in channel %f after filtering" % (f / float(1e6),f / (max_freq / float(no_bins)))
+tone = np.zeros(no_samples)
+if tone_generation_mode == "sine": 
+    for f in tone_freq:
+        for n in np.arange(0,no_samples):
+            tone[n] += np.sin(2 * np.pi * n * (f / float(sampling_freq)))
+        print "frequency %f MHz should be in channel %f after filtering" % (f / float(1e6),f / (max_freq / float(no_bins)))
+elif tone_generation_mode == "noise":
+    tone = np.random.randn(no_samples)
+elif tone_generation_mode == "impulse":
+    print "impulse at sample %d" % impulse_shift
+    tone[impulse_shift] = 1
+else:
+    print "invalid tone generation option"
+    exit(1)
 
 '''
 FORWARD PFB
 '''
+print ">>>Computing pfb"
 #setup the windowing function
 w = scipy.signal.firwin(P * N, 1. / N).reshape(P, N)
 
@@ -45,10 +57,10 @@ pfb_input[pad:pad+no_samples] = tone
 pfb_filtered_output = np.zeros(no_samples).astype(np.complex64)
 pfb_output = np.zeros(no_samples).astype(np.complex64)
 for lB in range(0,no_samples,N):
-    pfb_filtered_output[lB:lB+N] = ((pfb_input[lB:lB+(P*N)].reshape(P,N))*w).sum(axis=0) 
+    pfb_filtered_output[lB:lB+N] = (pfb_input[lB:lB+(P*N)].reshape(P,N)*w).sum(axis=0) 
     pfb_output[lB:lB+N] = np.fft.fft(pfb_filtered_output[lB:lB+N])
       
-
+print ">>>Computing the comparison unfiltered SFFT" 
 '''
 take Short Time FFTs without filtering for comparison
 '''
@@ -60,10 +72,14 @@ for lB in range(0,no_samples,N):
 '''
 INVERSE PFB
 '''
-#setup the inverse windowing function
-#w_i = (scipy.signal.firwin(P * N, 1. / N)[::-1]).reshape(P, N)
-w_i = w # filter is semetrical, so there should not be a difference if we flip it or not
+print ">>>Computing inverse pfb"
+'''
+I have a hunch this is wrong: T Karp and N.J. Fliege's suggestion: corresponding analysis and synthesis subfilters are equal
 
+Setup the inverse windowing function (note it should be the flipped impulse responses of the original subfilters,
+according to Daniel Zhou, A REVIEW OF POLYPHASE FILTER BANKS AND THEIR APPLICATION
+'''
+w_i = np.flipud(w)
 
 len_of_valid_pfb_output = no_samples - pad
 pfb_inverse_input = np.zeros(len_of_valid_pfb_output + pad).astype(np.complex64)
@@ -75,28 +91,39 @@ pfb_inverse_output = np.zeros(len_of_valid_pfb_output).astype(np.complex64)
 for computational efficiency invert every FFT from the forward process only once... for xx large data
 we'll need a ring buffer to store the previous IFFTs
 '''
-
 for lB in range(0,no_samples,N):
     pfb_inverse_ifft_output[lB:lB+N] = np.fft.ifft(pfb_inverse_input[lB:lB+N])
 
+'''
+Inverse filterbank
+Note the commutator rotates in the opposite direction to the forward process and we'll have to flip the output
+when we save to the array.
+'''
+
 for lB in range(0,len_of_valid_pfb_output,N):
-    pfb_inverse_output[lB:lB+N] = np.fliplr(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
-
-xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone[0:len_of_valid_pfb_output-pad])
+    pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0) 
 
 
+if should_x_correlate:
+   print ">>>Computing X correlation between input signal and pfb inverse output"
+   xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone)
+if should_compute_auto_correlate:
+   print ">>>Computing auto correlation of input signal"
+   input_auto_correlate = scipy.signal.correlate(tone[0:min(10000,len(tone))], tone[0:min(10000,len(tone))])
+print ">>>All done! Plotting..."
 '''
 Plot
 '''
 figure(1)
 subplot(211)
-title("Unfiltered Short time fast fourier transforms")
+title("Input signal")
 plot(pfb_input)
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, no_samples-pad,N):
     axvline(x=pad + x,linewidth=1, color='g')
     
 subplot(212)
+title("Unfiltered Short time fast fourier transforms")
 plot(np.abs(unfiltered_output))
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, no_samples-pad,N):
@@ -113,12 +140,13 @@ plot(w_i.reshape(P*N))
   
 figure(3)
 subplot(211)
-title("Filtered Short time fast fourier transforms")
+title("PFB Filtered Signal")
 plot(pfb_filtered_output)
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, no_samples-pad,N):
     axvline(x=pad + x,linewidth=1, color='g')
 subplot(212)
+title("Filtered Short Time Fast Fourier Transforms")
 plot(np.abs(pfb_output))
 axvline(x=pad,linewidth=2, color='r')
 for x in range(N, no_samples-pad,N):
@@ -157,9 +185,18 @@ title("FFT.i of inverse pfb")
 plot(np.arange(0,sampling_freq,sampling_freq/num_fourier_samples)[0:num_fourier_samples/2]/1.0e6,np.abs(np.imag(fft_pfb_inv_output))[0:num_fourier_samples/2])
 xlabel("F (MHz)")
 
-figure(6)
-title("X correlation between tone and pfb^(-1)")
-plot(xCor)
-xlabel("Sample number")
+if should_x_correlate:
+   figure(6)
+   title("X correlation between tone and pfb^(-1)")
+   plot(xCor)
+   xlabel("Sample number")
+
+if should_compute_auto_correlate:
+   figure(7)
+   title("Auto correlation of tone")
+   plot(input_auto_correlate)
+   xlabel("Sample number")
 show()
+
+
 
