@@ -15,14 +15,14 @@ P = 8  #no. subfilters in the bank
 window_length = N * P #length of the hamming window
 no_bins = N / 2 #real FFTs mirror half the bins
 #tone_freq = [max_freq / float(no_bins) * (100)]
-tone_freq = [max_freq / float(no_bins) * (150.3)]
+#tone_freq = [max_freq / float(no_bins) * (150.3)]
 #tone_freq = [max_freq / float(no_bins) * (100.0),max_freq / float(no_bins) * (150.0)] 
-#tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.45)] 
+tone_freq = [max_freq / float(no_bins) * (100),max_freq / float(no_bins) * (150.45)] 
 impulse_shift = N*P + 0.25*N
-tone_generation_mode = "sine" #toggle between using a sinusoidal tone @ tone_freq OR generating gausian noise OR impulse (shifted delta)
-should_compute_auto_correlate = False
+tone_generation_mode = "noise" #toggle between using a sinusoidal tone @ tone_freq OR generating gausian noise OR impulse (shifted delta)
+should_compute_auto_correlate = True
 should_x_correlate = True
-no_samples = window_length*10   
+no_samples = window_length*3   
 pad = N*P #pad the tone
 
 '''
@@ -106,10 +106,34 @@ for lB in range(0,len_of_valid_pfb_output,N):
 
 if should_x_correlate:
    print ">>>Computing X correlation between input signal and pfb inverse output"
-   xCor = scipy.signal.correlate(pfb_inverse_output[pad:len_of_valid_pfb_output], tone)
+   xCor = scipy.signal.correlate(tone,pfb_inverse_output[pad:len_of_valid_pfb_output])
+   am = np.argmax(xCor)
+   maxV = np.max(xCor)
+   print "Signal shift: %d samples" % (am - (len_of_valid_pfb_output-pad-1))
+
+   octile = (len(xCor)//8)
+   data_subset = np.zeros(octile*2)
+   data_subset[0:octile] = xCor[2*octile:3*octile]
+   data_subset[octile:2*octile] = xCor[5*octile:6*octile]
+   mean = np.mean(data_subset)
+   stddev = np.std(data_subset)
+   print "Mean = %f, sample standard deviation = %f, ratio max:(mean+ssd) = %f" % (mean,stddev,maxV/(mean+stddev))
+
 if should_compute_auto_correlate:
    print ">>>Computing auto correlation of input signal"
-   input_auto_correlate = scipy.signal.correlate(tone[0:min(10000,len(tone))], tone[0:min(10000,len(tone))])
+   input_auto_correlate = scipy.signal.correlate(tone, tone)
+   am = np.argmax(input_auto_correlate)
+   maxV = np.max(input_auto_correlate) 
+   print "Signal shift: %d samples" % (am - (no_samples-1))
+
+   octile = (len(input_auto_correlate)//8)
+   data_subset = np.zeros(octile*2)
+   data_subset[0:octile] = input_auto_correlate[2*octile:3*octile]
+   data_subset[octile:2*octile] = input_auto_correlate[5*octile:6*octile]
+   mean = np.mean(data_subset)
+   stddev = np.std(data_subset)
+   print "Mean = %f, sample standard deviation = %f, ratio max:(mean+ssd) = %f" % (mean,stddev,maxV/(mean+stddev))
+  
 print ">>>All done! Plotting..."
 '''
 Plot
