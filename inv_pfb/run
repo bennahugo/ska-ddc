@@ -1,0 +1,2 @@
+#!/bin/bash
+./build/inv_pfb fir_pfb_prototype_512x8.dat 8192 pfb_noise_8_x_512_complex.dat pfb_inv_noise_c_ver.dat  
