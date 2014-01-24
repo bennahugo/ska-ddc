@@ -1,9 +1,19 @@
 project(inv_pfb)
 
-add_executable(inv_pfb inv_pfb.c)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
+#declare executable
 
-find_package(rt)
-target_link_libraries(inv_pfb rt)
+FIND_PACKAGE(CUDA)
+if(CUDA_FOUND)
+    SET(CUDA_NVCC_FLAGS "-O3 -Xcompiler -fopenmp -gencode arch=compute_20,code=sm_20 -gencode arch=compute_20,code=sm_21 -gencode arch=compute_30,code=sm_30")
+else(CUDA_FOUND)
+    message("CUDA is not installed on this system.")
+endif()
+
+cuda_add_executable(inv_pfb inv_pfb.cu)
+install(TARGETS inv_pfb RUNTIME DESTINATION bin)
+#link external libraries
+SET(CMAKE_REQUIRED_FLAGS "-Wl,--no-undefined")
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -12,6 +22,6 @@ if (OPENMP_FOUND)
 endif()
 target_link_libraries(inv_pfb gomp)
 
-install(TARGETS inv_pfb RUNTIME DESTINATION bin)
+CUDA_ADD_CUFFT_TO_TARGET(inv_pfb)
 
-set( CMAKE_CXX_FLAGS "-Wall -m64 -O3 -fopenmp" )
+set(CMAKE_BUILD_TYPE Release)
