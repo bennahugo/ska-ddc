@@ -3,8 +3,8 @@
 # This is an example script
 #
 #These commands set up the Grid Environment for your job:
-#PBS -N SKA__DDC
-#PBS -l nodes=gpu001:ppn=16:seriesGPU,walltime=00:01:00
+#PBS -N SKA__PFB
+#PBS -l nodes=srvslsgpu002:ppn=1:seriesGPU,walltime=00:01:00
 #PBS -q GPUQ
 #
 
