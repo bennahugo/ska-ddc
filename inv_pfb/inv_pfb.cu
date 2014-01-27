@@ -141,7 +141,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 		cudaSafeCall(cudaMemcpy((cufftComplex *)((float*)d_input + PAD) + (i/2 + 1) ,input + stride_start + i,sizeof(complex_float)*fft_block_size,cudaMemcpyHostToDevice)); 
 	}
 	//ifft the data in place (starting after the initial padding ofc)
-	cufftSafeCall(cufftExecC2R(plan,d_input+PAD,(cufftReal *)(d_input+PAD)));	
+	cufftSafeCall(cufftExecC2R(plan,(cufftComplex *)((float *)d_input+PAD),(cufftReal *)((float *)d_input+PAD)));	
 	cudaThreadSynchronize();	
 	//reserve memory for output
 	float * d_output;
@@ -204,7 +204,7 @@ __global__ void ipfb(const float * input,  float * output, const float * prototy
 	uint32_t lB = blockIdx.x * blockDim.x;
 	uint32_t filter_index = N-threadIdx.x-1;
 	register float accum = input[lB + threadIdx.x]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
-	#pragma unroll P
+	#pragma unroll
 	for (uint32_t p = 1; p < P; ++p)
 		accum = input[lB + threadIdx.x + p*N]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
 	output[lB + threadIdx.x] = accum;
