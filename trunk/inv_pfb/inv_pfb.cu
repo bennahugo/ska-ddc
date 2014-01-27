@@ -12,6 +12,13 @@
 #define WINDOW_LENGTH N*P
 #define PAD N*P
 
+/****************************************************************************************************************
+ debugging flags
+*****************************************************************************************************************/
+//#define DUMP_IFFT_DATA_TO_DISK //uncomment to dump ifft data (of last processed stride) to disk
+#define IFFT_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/runs/SKA__ifft.dump"
+
+
 typedef struct {
 	float r;
 	float i;
@@ -77,7 +84,7 @@ float * initDevice(const float * taps){
         	        properties.pciBusID,properties.clockRate / 1000000.0);
 	        printf("Compute capability %d.%d with %f GiB global memory (%f GiB free)\n",properties.major,
         	        properties.minor,mem_tot/1024.0/1024.0/1024.0,mem_free/1024.0/1024.0/1024.0);
-	        printf("%d SMs are available",properties.multiProcessorCount);
+	        printf("%d SMs are available\n",properties.multiProcessorCount);
 	        printf("---------------------------------------------------------\n");
 	} else {
 		fprintf(stderr,"Cannot find suitable GPU device. Giving up");
@@ -126,17 +133,27 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 	cufftSafeCall(cufftPlan1d(&plan, fft_block_size,  CUFFT_C2R, num_blocks));
 	cufftComplex * d_input;
 	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage
-	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*num_blocks)+PAD));
+	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*num_blocks)+PAD*sizeof(float)));
 	//copy fft blocks to device where we will ifft them in batches
 	//TODO: this should be changed to simply copy the spectra as is, because the pfb output of the beamformer is already only sending N/2 of each FFT
-	for (uint32_t i = 0; i < stride_length; i += N)
-		cudaMemcpy(d_input + (i/2 + 1) + PAD ,input + stride_start + i,sizeof(complex_float)*fft_block_size,cudaMemcpyHostToDevice); 
+	for (uint32_t i = 0; i < stride_length; i += N){
+		//printf("Copying %d / %d blocks to GPU \n",i/N + 1,num_blocks);
+		cudaSafeCall(cudaMemcpy((cufftComplex *)((float*)d_input + PAD) + (i/2 + 1) ,input + stride_start + i,sizeof(complex_float)*fft_block_size,cudaMemcpyHostToDevice)); 
+	}
 	//ifft the data in place (starting after the initial padding ofc)
-	cufftSafeCall(cufftExecC2R(plan,d_input+PAD,(cufftReal *)(d_input+PAD)));
+	cufftSafeCall(cufftExecC2R(plan,d_input+PAD,(cufftReal *)(d_input+PAD)));	
 	cudaThreadSynchronize();	
 	//reserve memory for output
 	float * d_output;
 	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*stride_length));
+	//dump ifft data to disk for debugging
+	#ifdef DUMP_IFFT_DATA_TO_DISK
+		float * ifft_out = (float *)malloc(sizeof(float)*stride_length);
+		cudaSafeCall(cudaMemcpy(ifft_out,(float*)d_input + PAD, sizeof(float)*stride_length,cudaMemcpyDeviceToHost));
+		writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),stride_length,ifft_out);	
+		free(ifft_out);
+	#endif
+	
 	//now do the inverse pfb
 	dim3 threadsPerBlock(N,1,1);
 	dim3 numBlocks(stride_length / N,1,1);
@@ -148,6 +165,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 		exit(-1);
 	}
 	cudaMemcpy(output_buffer, d_output,sizeof(float)*stride_length,cudaMemcpyDeviceToHost);
+	
 	//finally free device memory and destroy the IFFT plan
 	cudaFree(d_input);
 	cudaFree(d_output);	
@@ -226,7 +244,8 @@ int main ( int argc, char ** argv ){
 	float * output = (float*) malloc(sizeof(float)*num_samples);
 	
 	//do some processing
-	//processStride(0, num_samples, d_taps, pfb_data, output);	
+	processStride(0, num_samples, d_taps, pfb_data, output);	
+        writeDataToDisk(output_filename,sizeof(float),num_samples,output);
 	
 	//release the device
 	releaseDevice(d_taps);
