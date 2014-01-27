@@ -130,7 +130,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 	cufftHandle plan;
 	uint32_t fft_block_size = floor(N/2 + 1);
 	uint32_t num_blocks = stride_length/N;
-	cufftSafeCall(cufftPlan1d(&plan, fft_block_size,  CUFFT_C2R, num_blocks));
+	cufftSafeCall(cufftPlan1d(&plan, N,  CUFFT_C2R, num_blocks));
 	cufftComplex * d_input;
 	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage
 	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*num_blocks)+PAD*sizeof(float)));
@@ -224,7 +224,7 @@ int main ( int argc, char ** argv ){
 	num_samples = atoi(argv[2]);
 	pfb_output_filename = argv[3];
 	output_filename = argv[4];
-	printf("Performing operation on %d samples\n",num_samples);
+	printf("Performing operation on %d samples from '%s'\n",num_samples,pfb_output_filename);
 	
 	//Read in taps file (prototype filter)	
 	float * taps = (float*) malloc(sizeof(float)*WINDOW_LENGTH);
