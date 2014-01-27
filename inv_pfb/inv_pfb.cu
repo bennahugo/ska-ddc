@@ -150,6 +150,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 	#ifdef DUMP_IFFT_DATA_TO_DISK
 		float * ifft_out = (float *)malloc(sizeof(float)*stride_length);
 		cudaSafeCall(cudaMemcpy(ifft_out,(float*)d_input + PAD, sizeof(float)*stride_length,cudaMemcpyDeviceToHost));
+		printf("Dumping %d samples to disk\n",stride_length);
 		writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),stride_length,ifft_out);	
 		free(ifft_out);
 	#endif
@@ -223,7 +224,7 @@ int main ( int argc, char ** argv ){
 	num_samples = atoi(argv[2]);
 	pfb_output_filename = argv[3];
 	output_filename = argv[4];
-	
+	printf("Performing operation on %d samples\n",num_samples);
 	
 	//Read in taps file (prototype filter)	
 	float * taps = (float*) malloc(sizeof(float)*WINDOW_LENGTH);
