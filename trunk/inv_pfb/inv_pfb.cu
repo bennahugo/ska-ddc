@@ -15,8 +15,8 @@
 /****************************************************************************************************************
  debugging flags
 *****************************************************************************************************************/
-//#define DUMP_IFFT_DATA_TO_DISK //uncomment to dump ifft data (of last processed stride) to disk
-#define IFFT_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/runs/SKA__ifft.dump"
+#define DUMP_IFFT_DATA_TO_DISK //uncomment to dump ifft data (of last processed stride) to disk
+#define IFFT_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/FFT_INV_ON_PFB_DATA.dat"
 
 
 typedef struct {
