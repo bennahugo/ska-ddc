@@ -151,20 +151,19 @@ void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, cons
         #endif
 	//reserve memory for output
 	float * d_output;
-	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*output_length_in_samples));
-	/*
+	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*(output_length_in_samples)));
 	//now do the inverse pfb
 	dim3 threadsPerBlock(N,1,1);
 	dim3 numBlocks(stride_length_in_blocks,1,1);
-	ipfb<<<numBlocks,threadsPerBlock,0>>>((float*)d_input,d_output,d_taps);
+	ipfb<<<numBlocks,threadsPerBlock,0>>>((float*)d_invFFT,d_output,d_taps);
 	cudaThreadSynchronize();
 	cudaError code = cudaGetLastError();
 	if (code != cudaSuccess){
 		fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code)); 
 		exit(-1);
 	}
-	cudaMemcpy(output_buffer, d_output,sizeof(float)*output_length_in_samples,cudaMemcpyDeviceToHost);
-	*/
+	cudaMemcpy(output_buffer, d_output,sizeof(float)*(output_length_in_samples),cudaMemcpyDeviceToHost);
+
 	//finally free device memory and destroy the IFFT plan
 	cudaFree(d_input);
 	cudaFree(d_invFFT);
@@ -190,7 +189,7 @@ for (l = 0; l < stride_length; l += N) in parallel
 	for (n = 0; n < N; ++n) in parallel
 		accum = x[l+n]h[N - n - 1]
 		for (p = 1; p < P; ++p)
-			accum = x[l+n+p*N]h[p*N + (N - n - 1)]
+			accum += x[l+n+p*N]h[p*N + (N - n - 1)]
 		endfor
 	endfor
 endfor
@@ -201,12 +200,12 @@ each y[n] in forward or reverse does not matter. It should be clear that if the 
 accumulation set to a position in the last subfilter the result should remain the same.
 */
 __global__ void ipfb(const float * input,  float * output, const float * prototype_filter){
-	uint32_t lB = blockIdx.x * blockDim.x;
-	uint32_t filter_index = N-threadIdx.x-1;
+	uint32_t lB = blockIdx.x * N;
+	uint32_t filter_index = N - threadIdx.x - 1;
 	register float accum = input[lB + threadIdx.x]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
 	#pragma unroll
 	for (uint32_t p = 1; p < P; ++p)
-		accum = input[lB + threadIdx.x + p*N]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
+		accum += input[lB + threadIdx.x + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
 	output[lB + threadIdx.x] = accum;
 }
 
@@ -258,8 +257,9 @@ int main ( int argc, char ** argv ){
 	float * output = (float*) malloc(sizeof(float)*num_samples);
 	
 	//do some processing
-	processStride(0, num_samples/N, d_taps, trimmed_pfb_data, output);	
-        writeDataToDisk(output_filename,sizeof(float),num_samples,output);
+	uint32_t stride_length_in_blocks = num_samples / N;
+	processStride(0, stride_length_in_blocks, d_taps, trimmed_pfb_data, output);	
+        writeDataToDisk(output_filename,sizeof(float),num_samples-PAD,output+PAD);
 	
 	//release the device
 	releaseDevice(d_taps);
