@@ -17,7 +17,8 @@
 *****************************************************************************************************************/
 #define DUMP_IFFT_DATA_TO_DISK //uncomment to dump ifft data (of last processed stride) to disk
 #define IFFT_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/FFT_INV_ON_PFB_DATA.dat"
-
+#define DUMP_TRIMMED_DATA
+#define TRIMMED_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/TRIMMED_PFB.dat"
 
 typedef struct {
 	float r;
@@ -129,25 +130,25 @@ void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, cons
 	cufftHandle plan;
 	cufftSafeCall(cufftPlan1d(&plan, N,  CUFFT_C2R, stride_length_in_blocks));
 	cufftComplex * d_input;
-	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage
-	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*stride_length_in_blocks)+PAD*sizeof(float)));
-	cudaSafeCall(cudaMemcpy((cufftComplex *)((float *)d_input + PAD),input,sizeof(complex_float)*stride_length_in_blocks * fft_block_size,cudaMemcpyHostToDevice));
+	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage:
+	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex) * fft_block_size * stride_length_in_blocks + sizeof(cufftReal) * PAD));	
+	//copy everything into the device input vector, after the initial padding (in floats)
+	cudaSafeCall(cudaMemcpy((cufftReal *)d_input + PAD,input,sizeof(complex_float) * stride_length_in_blocks * fft_block_size,cudaMemcpyHostToDevice));
 	//ifft the data in place (starting after the initial padding ofc)
-	cufftSafeCall(cufftExecC2R(plan,(cufftComplex *)((float *)d_input+PAD),(cufftReal *)((float *)d_input+PAD)));	
+	cufftSafeCall(cufftExecC2R(plan,(cufftComplex *)((cufftReal *)d_input + PAD),(cufftReal *)d_input + PAD));
 	cudaThreadSynchronize();	
 	//reserve memory for output
 	float * d_output;
 	uint32_t output_length_in_samples = stride_length_in_blocks * N;
 	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*output_length_in_samples));
 	//dump ifft data to disk for debugging
-	#ifdef DUMP_IFFT_DATA_TO_DISK
-		float * ifft_out = (float *)malloc(sizeof(float)*output_length_in_samples);
-		cudaSafeCall(cudaMemcpy(ifft_out,(float*)d_input + PAD, sizeof(float)*output_length_in_samples,cudaMemcpyDeviceToHost));
-		printf("Dumping %d samples to disk\n",output_length_in_samples);
-		writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),output_length_in_samples,ifft_out);	
-		free(ifft_out);
-	#endif
-	
+        #ifdef DUMP_IFFT_DATA_TO_DISK
+                float * ifft_out = (float *)malloc(sizeof(float)*output_length_in_samples);
+                cudaSafeCall(cudaMemcpy(ifft_out,(cufftReal *)d_input + PAD, sizeof(cufftReal) * output_length_in_samples,cudaMemcpyDeviceToHost));
+                writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),output_length_in_samples,ifft_out);
+                free(ifft_out);
+        #endif
+	/*
 	//now do the inverse pfb
 	dim3 threadsPerBlock(N,1,1);
 	dim3 numBlocks(stride_length_in_blocks,1,1);
@@ -159,7 +160,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, cons
 		exit(-1);
 	}
 	cudaMemcpy(output_buffer, d_output,sizeof(float)*output_length_in_samples,cudaMemcpyDeviceToHost);
-	
+	*/
 	//finally free device memory and destroy the IFFT plan
 	cudaFree(d_input);
 	cudaFree(d_output);	
@@ -206,9 +207,9 @@ __global__ void ipfb(const float * input,  float * output, const float * prototy
 
 void cutDuplicatesFromData(const complex_float * in, complex_float * out, uint32_t orig_count){
 	assert(orig_count % N == 0); //only whole blocks should be processed
-	uint32_t blockLength = orig_count / N + 1;
-	for (uint32_t i = 0; i < orig_count; i += N)
-		memcpy(out + (i/N + 1), in + i, blockLength * sizeof(complex_float));
+	for (uint32_t i = 0; i < orig_count; i += N){
+		memcpy(out + (i/N)*(N/2 + 1), in + i, (N/2 + 1) * sizeof(complex_float));
+	}
 }
 
 int main ( int argc, char ** argv ){
@@ -234,9 +235,9 @@ int main ( int argc, char ** argv ){
 	}
 	
 	//Read in input file (output of earlier pfb process, so these will be complex numbers
-	complex_float * pfb_data = (complex_float*) malloc(sizeof(complex_float)*(num_samples + PAD)); //pad the array with N*P positions
+	complex_float * pfb_data = (complex_float*) malloc(sizeof(complex_float)*(num_samples)); //pad the array with N*P positions
 
-	if (readDataFromDisk(pfb_output_filename,sizeof(complex_float),num_samples,pfb_data + PAD) != num_samples){
+	if (readDataFromDisk(pfb_output_filename,sizeof(complex_float),num_samples,pfb_data) != num_samples){
 		fprintf(stderr, "input pfb data does not contain %d samples\n", num_samples);
 		return 1;
 	}
@@ -244,7 +245,9 @@ int main ( int argc, char ** argv ){
 	uint32_t trimmed_input_length = (N/2+1)*(num_samples / N);
 	complex_float * trimmed_pfb_data = (complex_float*) malloc(sizeof(complex_float)*trimmed_input_length);
 	cutDuplicatesFromData(pfb_data,trimmed_pfb_data,num_samples);
-
+	#ifdef DUMP_TRIMMED_DATA
+		writeDataToDisk(TRIMMED_DATA_OUTPUT_FILE,sizeof(complex_float),trimmed_input_length,trimmed_pfb_data);
+	#endif
 	//Setup the device and copy the taps
 	float * d_taps = initDevice(taps);
 	float * output = (float*) malloc(sizeof(float)*num_samples);
