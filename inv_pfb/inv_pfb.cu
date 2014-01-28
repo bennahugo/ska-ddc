@@ -113,51 +113,44 @@ void releaseDevice(float * d_taps){
 /**
 This method will process a subset of the complex input from a pfb process and output the inverse pfb.
 @args stride_start starting position in input array
-@args stride_length number of complex numbers to process in the input array
+@args stride_length_in_blocks number of N/2 + 1 length FFTs contained in the input
 @args d_taps *DEVICE* pointer to the filter taps which should already be preloaded on the device
 @args input list of complex numbers as output by a pfb process
 @args output_buffer preallocated buffer of size stride_length in which the inverse pfb output will be dumped
 
 Note:
 	The following condition must be satisfied:
-	stide_length is divisable by N - all sub-windows should be completely filled
+	length of the input should be divisiable by the block length (2 / N + 1) - as it should be when output by a pfb 
 */
-void processStride(uint32_t stride_start, uint32_t stride_length, const float * d_taps, 
+void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, const float * d_taps, 
 		   const complex_float * input, float * output_buffer){
-	assert(stride_length % N == 0); //only whole blocks should be processed
-	
+	uint32_t fft_block_size = N/2 + 1;
 	//Setup CU IFFT plan to process all the separate ffts in this stride in one go before we undo the filterbank
 	cufftHandle plan;
-	uint32_t fft_block_size = floor(N/2 + 1);
-	uint32_t num_blocks = stride_length/N;
-	cufftSafeCall(cufftPlan1d(&plan, N,  CUFFT_C2R, num_blocks));
+	cufftSafeCall(cufftPlan1d(&plan, N,  CUFFT_C2R, stride_length_in_blocks));
 	cufftComplex * d_input;
 	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage
-	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*num_blocks)+PAD*sizeof(float)));
-	//copy fft blocks to device where we will ifft them in batches
-	//TODO: this should be changed to simply copy the spectra as is, because the pfb output of the beamformer is already only sending N/2 of each FFT
-	for (uint32_t i = 0; i < stride_length; i += N){
-		//printf("Copying %d / %d blocks to GPU \n",i/N + 1,num_blocks);
-		cudaSafeCall(cudaMemcpy((cufftComplex *)((float*)d_input + PAD) + (i/2 + 1) ,input + stride_start + i,sizeof(complex_float)*fft_block_size,cudaMemcpyHostToDevice)); 
-	}
+	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex)*(fft_block_size*stride_length_in_blocks)+PAD*sizeof(float)));
+	cudaSafeCall(cudaMemcpy((cufftComplex *)((float *)d_input + PAD),input,sizeof(complex_float)*stride_length_in_blocks * fft_block_size,cudaMemcpyHostToDevice));
 	//ifft the data in place (starting after the initial padding ofc)
 	cufftSafeCall(cufftExecC2R(plan,(cufftComplex *)((float *)d_input+PAD),(cufftReal *)((float *)d_input+PAD)));	
 	cudaThreadSynchronize();	
 	//reserve memory for output
 	float * d_output;
-	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*stride_length));
+	uint32_t output_length_in_samples = stride_length_in_blocks * N;
+	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*output_length_in_samples));
 	//dump ifft data to disk for debugging
 	#ifdef DUMP_IFFT_DATA_TO_DISK
-		float * ifft_out = (float *)malloc(sizeof(float)*stride_length);
-		cudaSafeCall(cudaMemcpy(ifft_out,(float*)d_input + PAD, sizeof(float)*stride_length,cudaMemcpyDeviceToHost));
-		printf("Dumping %d samples to disk\n",stride_length);
-		writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),stride_length,ifft_out);	
+		float * ifft_out = (float *)malloc(sizeof(float)*output_length_in_samples);
+		cudaSafeCall(cudaMemcpy(ifft_out,(float*)d_input + PAD, sizeof(float)*output_length_in_samples,cudaMemcpyDeviceToHost));
+		printf("Dumping %d samples to disk\n",output_length_in_samples);
+		writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),output_length_in_samples,ifft_out);	
 		free(ifft_out);
 	#endif
 	
 	//now do the inverse pfb
 	dim3 threadsPerBlock(N,1,1);
-	dim3 numBlocks(stride_length / N,1,1);
+	dim3 numBlocks(stride_length_in_blocks,1,1);
 	ipfb<<<numBlocks,threadsPerBlock,0>>>((float*)d_input,d_output,d_taps);
 	cudaThreadSynchronize();
 	cudaError code = cudaGetLastError();
@@ -165,7 +158,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length, const float * 
 		fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code)); 
 		exit(-1);
 	}
-	cudaMemcpy(output_buffer, d_output,sizeof(float)*stride_length,cudaMemcpyDeviceToHost);
+	cudaMemcpy(output_buffer, d_output,sizeof(float)*output_length_in_samples,cudaMemcpyDeviceToHost);
 	
 	//finally free device memory and destroy the IFFT plan
 	cudaFree(d_input);
@@ -211,6 +204,13 @@ __global__ void ipfb(const float * input,  float * output, const float * prototy
 	output[lB + threadIdx.x] = accum;
 }
 
+void cutDuplicatesFromData(const complex_float * in, complex_float * out, uint32_t orig_count){
+	assert(orig_count % N == 0); //only whole blocks should be processed
+	uint32_t blockLength = orig_count / N + 1;
+	for (uint32_t i = 0; i < orig_count; i += N)
+		memcpy(out + (i/N + 1), in + i, blockLength * sizeof(complex_float));
+}
+
 int main ( int argc, char ** argv ){
 	char * taps_filename;
 	char * pfb_output_filename;
@@ -240,12 +240,17 @@ int main ( int argc, char ** argv ){
 		fprintf(stderr, "input pfb data does not contain %d samples\n", num_samples);
 		return 1;
 	}
+	//Format the data into N/2 + 1 sized chunks to cut away unnecessary samples for the IFFT
+	uint32_t trimmed_input_length = (N/2+1)*(num_samples / N);
+	complex_float * trimmed_pfb_data = (complex_float*) malloc(sizeof(complex_float)*trimmed_input_length);
+	cutDuplicatesFromData(pfb_data,trimmed_pfb_data,num_samples);
+
 	//Setup the device and copy the taps
 	float * d_taps = initDevice(taps);
 	float * output = (float*) malloc(sizeof(float)*num_samples);
 	
 	//do some processing
-	processStride(0, num_samples, d_taps, pfb_data, output);	
+	processStride(0, num_samples/N, d_taps, trimmed_pfb_data, output);	
         writeDataToDisk(output_filename,sizeof(float),num_samples,output);
 	
 	//release the device
@@ -254,6 +259,7 @@ int main ( int argc, char ** argv ){
 	//free any hostside memory:
 	free(output);
 	free(pfb_data);
-	free(taps);	
+	free(taps);
+	free(trimmed_pfb_data);	
 	printf("Application Terminated Normally\n");
 }
