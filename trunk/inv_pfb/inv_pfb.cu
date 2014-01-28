@@ -126,28 +126,32 @@ Note:
 void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, const float * d_taps, 
 		   const complex_float * input, float * output_buffer){
 	uint32_t fft_block_size = N/2 + 1;
+	uint32_t output_length_in_samples = stride_length_in_blocks * N;
 	//Setup CU IFFT plan to process all the separate ffts in this stride in one go before we undo the filterbank
 	cufftHandle plan;
 	cufftSafeCall(cufftPlan1d(&plan, N,  CUFFT_C2R, stride_length_in_blocks));
 	cufftComplex * d_input;
-	//there should be more than enough memory for an inplace ifft since the original data is complex. Add some padding for the filtering stage:
-	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex) * fft_block_size * stride_length_in_blocks + sizeof(cufftReal) * PAD));	
-	//copy everything into the device input vector, after the initial padding (in floats)
-	cudaSafeCall(cudaMemcpy((cufftReal *)d_input + PAD,input,sizeof(complex_float) * stride_length_in_blocks * fft_block_size,cudaMemcpyHostToDevice));
-	//ifft the data in place (starting after the initial padding ofc)
-	cufftSafeCall(cufftExecC2R(plan,(cufftComplex *)((cufftReal *)d_input + PAD),(cufftReal *)d_input + PAD));
-	cudaThreadSynchronize();	
-	//reserve memory for output
-	float * d_output;
-	uint32_t output_length_in_samples = stride_length_in_blocks * N;
-	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*output_length_in_samples));
-	//dump ifft data to disk for debugging
+	cufftReal * d_invFFT;
+	//alloc space for ifft input and output vectors on the device. The input vector should be BATCH * (N/2 + 1) long 
+	//(consisting of complex numbers), and the output is BATCH * N long (consisting of real numbers)
+	cudaSafeCall(cudaMalloc((void**)&d_input,sizeof(cufftComplex) * fft_block_size * stride_length_in_blocks));
+	cudaSafeCall(cudaMalloc((void**)&d_invFFT,sizeof(cufftReal) * (output_length_in_samples + PAD)));
+	//copy everything into the device ifft input vector
+	cudaSafeCall(cudaMemcpy(d_input,input,sizeof(complex_float) * stride_length_in_blocks * fft_block_size,cudaMemcpyHostToDevice));
+	//ifft the data:
+	cufftSafeCall(cufftExecC2R(plan,d_input,d_invFFT + PAD));
+	cudaThreadSynchronize();
+	//dump ifft data to disk for debugging (this should be cross correlated with the python output, to test validity)
         #ifdef DUMP_IFFT_DATA_TO_DISK
                 float * ifft_out = (float *)malloc(sizeof(float)*output_length_in_samples);
-                cudaSafeCall(cudaMemcpy(ifft_out,(cufftReal *)d_input + PAD, sizeof(cufftReal) * output_length_in_samples,cudaMemcpyDeviceToHost));
+                //cudaSafeCall(cudaMemcpy(ifft_out,(cufftReal *)d_input + PAD, sizeof(cufftReal) * output_length_in_samples,cudaMemcpyDeviceToHost));
+                cudaSafeCall(cudaMemcpy(ifft_out,d_invFFT + PAD, sizeof(cufftReal) * output_length_in_samples,cudaMemcpyDeviceToHost));
                 writeDataToDisk(IFFT_DATA_OUTPUT_FILE,sizeof(float),output_length_in_samples,ifft_out);
                 free(ifft_out);
         #endif
+	//reserve memory for output
+	float * d_output;
+	cudaSafeCall(cudaMalloc((void**)&d_output,sizeof(float)*output_length_in_samples));
 	/*
 	//now do the inverse pfb
 	dim3 threadsPerBlock(N,1,1);
@@ -163,6 +167,7 @@ void processStride(uint32_t stride_start, uint32_t stride_length_in_blocks, cons
 	*/
 	//finally free device memory and destroy the IFFT plan
 	cudaFree(d_input);
+	cudaFree(d_invFFT);
 	cudaFree(d_output);	
 	cufftSafeCall(cufftDestroy(plan));
 }
