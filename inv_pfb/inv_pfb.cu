@@ -39,7 +39,7 @@ onto the device. ***WARNING***: this method must be called before the first stri
 */
 void initDevice(const float * taps){
 	//do some checks to see if we're initing a reasonable gpu setup:
-	assert(LOOP_LENGTH % FFT_SIZE == 0); //The data being uploaded to the device must consist of an integral number of FFT blocks.
+	assert((LOOP_LENGTH % FFT_SIZE) == 0); //The data being uploaded to the device must consist of an integral number of FFT blocks.
 
 	//Choose a reasonably good device(https://www.cs.virginia.edu/~csadmin/wiki/index.php/CUDA_Support/Choosing_a_GPU), based on # SMs:
 	int num_devices, device;
@@ -92,7 +92,7 @@ void initDevice(const float * taps){
 	printf("INIT: Setting up IFFT output buffer of length %d\n", BUFFER_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH)));
 	//Setup CU IFFT plan to process all the N-sample iffts contained in a single loop, in one go
-	uint32_t max_no_blocks = LOOP_LENGTH/FFT_LENGTH;
+	uint32_t max_no_blocks = LOOP_LENGTH/FFT_SIZE;
 	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",max_no_blocks);
         cufftSafeCall(cufftPlan1d(&ifft_plan, N,  CUFFT_C2R, max_no_blocks));
 	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) samples long (consisting of complex numbers)
@@ -156,8 +156,8 @@ device once off before processing starts and tairing down the memory allocations
 	equal to LOOP_LENGTH/(N/2+1)
 @precondition call initDevice BEFORE calling this method
 */
-void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride = LOOP_LENGTH/(N/2+1)){
-	assert(no_blocks_in_stride <= LOOP+LENGTH/(N/2+1)); //this is the maximum number of blocks we can sent to the GPU
+void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride){
+	assert(no_blocks_in_stride <= LOOP_LENGTH/(N/2+1)); //this is the maximum number of blocks we can sent to the GPU
 	//copy everything in this stride into the device ifft input vector
 	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride);
         cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_float) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
@@ -173,12 +173,13 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 		dim3 threadsPerBlock(N,1,1);
 		dim3 numBlocks(no_blocks_in_stride,1,1);
 		ipfb<<<numBlocks,threadsPerBlock,0>>>(d_ifft_output,d_filtered_output,d_taps);
-	}
-	cudaThreadSynchronize();
-	cudaError code = cudaGetLastError();
-	if (code != cudaSuccess){
-		fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code)); 
-		exit(-1);
+	
+		cudaThreadSynchronize();
+		cudaError code = cudaGetLastError();
+		if (code != cudaSuccess){
+			fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code)); 
+			exit(-1);
+		}
 	}
 	printf("Moving %d IFFT samples from position %d of the IFFT persistant buffer to index 0 of the buffer.\n",N * P,N * no_blocks_in_stride);
 	//move the last PAD samples in the ifft output array to the front of the ifft output array for processing the next stride of elements:
@@ -186,12 +187,14 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 		dim3 threadsPerBlock(N,1,1);
 		dim3 numBlocks(P,1,1);
 		move_last_P_iffts_to_front<<<numBlocks,threadsPerBlock,0>>>(d_ifft_output, N * no_blocks_in_stride);
+	
+		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly
+	        cudaError code = cudaGetLastError();
+        	if (code != cudaSuccess){
+                	fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code));
+                	exit(-1);
+		}
 	}
-	cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly
-        cudaError code = cudaGetLastError();
-        if (code != cudaSuccess){
-                fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code));
-                exit(-1);
 	//copy N-sized chunks to the output array:
 	printf("Finished inverse pdb on stride, copying %d blocks, each of %d elements from the device\n",no_blocks_in_stride,N);
 	cudaMemcpy(output_buffer, d_filtered_output,sizeof(float)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost);
@@ -291,11 +294,11 @@ int main ( int argc, char ** argv ){
 	
 	//do some processing
 	uint32_t stride_length_in_blocks = num_samples / N;
-	processStride(0, stride_length_in_blocks, trimmed_pfb_data, output);	
+	processNextStride(trimmed_pfb_data, output, stride_length_in_blocks);	
         writeDataToDisk(output_filename,sizeof(float),num_samples-PAD,output+PAD);
 	
 	//release the device
-	releaseDevice(d_taps);
+	releaseDevice();
 
 	//free any hostside memory:
 	free(output);
