@@ -13,13 +13,13 @@
 /****************************************************************************************************************
  constants
 *****************************************************************************************************************/
-#define N 512 //Number of FFT samples
-#define P 8 //Number of Filterbanks
-#define WINDOW_LENGTH N*P
-#define PAD N*P
-#define LOOP_LENGTH 1024 * 1024 //Size of chunk to send off to the GPU. This number must be divisable by FFT_SIZE (we should send an integral number of FFTs to the GPU).
-#define BUFFER_LENGTH LOOP_LENGTH + PAD //Number of elements in the persistant ifft output buffer
-#define FFT_SIZE = N/2 + 1; //size of each input FFT (non-redundant samples)
+const uint16_t N = 512; //Number of FFT samples
+const uint16_t P = 8; //Number of Filterbanks
+const uint32_t WINDOW_LENGTH = N*P;
+const uint32_t PAD = N*P;
+const uint32_t LOOP_LENGTH = 1024 * (N/2 + 1); //Size of chunk to send off to the GPU. This number must be divisable by FFT_SIZE (we should send an integral number of FFTs to the GPU).
+const uint32_t BUFFER_LENGTH = LOOP_LENGTH + PAD; //Number of elements in the persistant ifft output buffer
+const uint32_t FFT_SIZE = N/2 + 1; //size of each input FFT (non-redundant samples)
 
 /****************************************************************************************************************
  debugging flags
