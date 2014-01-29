@@ -1,0 +1,78 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <cuda.h>
+#include <cufft.h>
+#include <assert.h>
+#include "math.h"
+#include "file_reader.h"
+
+#ifndef INV_PFB_H
+#define INV_PFB_H
+
+/****************************************************************************************************************
+ constants
+*****************************************************************************************************************/
+#define N 512 //Number of FFT samples
+#define P 8 //Number of Filterbanks
+#define WINDOW_LENGTH N*P
+#define PAD N*P
+#define LOOP_LENGTH 1024 * 1024 //Size of chunk to send off to the GPU. This number must be divisable by FFT_SIZE (we should send an integral number of FFTs to the GPU).
+#define BUFFER_LENGTH LOOP_LENGTH + PAD //Number of elements in the persistant ifft output buffer
+#define FFT_SIZE = N/2 + 1; //size of each input FFT (non-redundant samples)
+
+/****************************************************************************************************************
+ debugging flags
+*****************************************************************************************************************/
+#define DUMP_IFFT_DATA_TO_DISK //uncomment to dump ifft data (of last processed stride) to disk
+#define IFFT_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/FFT_INV_ON_PFB_DATA.dat"
+#define DUMP_TRIMMED_DATA
+#define TRIMMED_DATA_OUTPUT_FILE "/home/bhugo/ska-res/ska-ddc/inv_pfb/TRIMMED_PFB.dat"
+
+/****************************************************************************************************************
+ necessary typedefs
+*****************************************************************************************************************/
+typedef struct {
+        float r;
+        float i;
+} complex_float;
+
+/****************************************************************************************************************
+ CUDA error handling macros
+****************************************************************************************************************/
+#define cudaSafeCall(value) {                                                                                   \
+        cudaError_t _m_cudaStat = value;                                                                                \
+        if (_m_cudaStat != cudaSuccess) {                                                                               \
+                fprintf(stderr, "Error %s at line %d in file %s\n",                                     \
+                                cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);           \
+                exit(1);                                                                                                                        \
+        } }
+
+inline void __cufftSafeCall( uint32_t err, const char *file, const int line ){
+        if ( CUFFT_SUCCESS != err ){
+                fprintf( stderr, "cufftSafeCall() failed at %s:%i\n", file, line);
+                exit( -1 );
+        }
+        return;
+}
+#define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
+
+/****************************************************************************************************************
+ Forward declarations
+*****************************************************************************************************************/
+void initDevice(const float * taps);
+void releaseDevice();
+void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride = LOOP_LENGTH/(N/2+1));
+__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter);
+__global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block);
+
+/****************************************************************************************************************
+ variables
+*****************************************************************************************************************/
+cufftReal * d_ifft_output;
+float * d_taps;
+cufftHandle ifft_plan;
+cufftComplex * d_ifft_input;
+float * d_filtered_output;
+
+#endif //ifndef INV_PFB_H
