@@ -17,7 +17,7 @@ const uint16_t P = 8; //Number of Filterbanks
 const uint32_t FFT_SIZE = N/2 + 1; //size of each input FFT (non-redundant samples)
 const uint32_t WINDOW_LENGTH = N*P;
 const uint32_t PAD = N*P;
-const uint32_t LOOP_LENGTH = 800 * FFT_SIZE; //Size of chunk to send off to the GPU. This number must be divisable by FFT_SIZE (we should send an integral number of FFTs to the GPU).
+const uint32_t LOOP_LENGTH = 100 * FFT_SIZE; //Size of chunk to send off to the GPU. This number must be divisable by FFT_SIZE (we should send an integral number of FFTs to the GPU).
 const uint32_t BUFFER_LENGTH = LOOP_LENGTH / FFT_SIZE * N + PAD; //Number of elements in the persistant ifft output buffer
 
 
