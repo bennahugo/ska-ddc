@@ -15,5 +15,5 @@ echo Dumping test data into $output_directory
 python tone_generator.py $output_directory/noise.dat $num_samples_to_use $tone_type $N $P
 python filter_generator.py $output_directory/prototype_FIR.dat $N $P
 python pfb_generator.py $output_directory/noise.dat $output_directory/prototype_FIR.dat $output_directory/pfb.dat $output_directory/unfiltered_ffts.dat $num_samples_to_use $N $P
-python ipfb_generator.py $output_directory/pfb.dat $output_directory/prototype_FIR.dat $output_directory/py_ipfb.dat $num_samples_to_use $N $P
+python ipfb_generator.py $output_directory/pfb.dat $output_directory/prototype_FIR.dat $output_directory/py_ifftedPFB.dat $output_directory/py_ipfb.dat $num_samples_to_use $N $P
 echo -e "Test data characteristics:\n--------------------------------------\nTone type: $tone_type\nN: $N\nP: $P\nNumber of samples: $num_samples_to_use" > $output_directory/test_data_characteristics.txt
