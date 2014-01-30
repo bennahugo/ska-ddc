@@ -10,7 +10,7 @@ else(CUDA_FOUND)
     message("CUDA is not installed on this system.")
 endif()
 
-cuda_add_executable(inv_pfb inv_pfb.cu)
+cuda_add_executable(inv_pfb driver.cpp inv_pfb.cu)
 install(TARGETS inv_pfb RUNTIME DESTINATION bin)
 #link external libraries
 SET(CMAKE_REQUIRED_FLAGS "-Wl,--no-undefined")
