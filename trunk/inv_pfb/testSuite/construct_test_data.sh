@@ -1,7 +1,7 @@
 #!/bin/bash
 N=512
 P=8
-num_samples_to_use=`expr $N \* $P \* 3`
+num_samples_to_use=`expr $N \* $P \* 100`
 output_directory=../data_out
 tone_type=noise
 
@@ -10,7 +10,7 @@ if [ -d "$output_directory" ]; then
 fi
 
 mkdir $output_directory
-
+echo Dumping test data into $output_directory
 #invoke scripts
 python tone_generator.py $output_directory/noise.dat $num_samples_to_use $tone_type $N $P
 python filter_generator.py $output_directory/prototype_FIR.dat $N $P

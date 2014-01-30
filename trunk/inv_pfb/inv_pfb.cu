@@ -30,6 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "inv_pfb.h"
+/****************************************************************************************************************
+ variables
+*****************************************************************************************************************/
+cufftReal * d_ifft_output;
+float * d_taps;
+cufftHandle ifft_plan;
+cufftComplex * d_ifft_input;
+float * d_filtered_output;
+
+/****************************************************************************************************************
+Forward declare kernels
+****************************************************************************************************************/
+__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter);
+__global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block);
 
 /**
 This method initializes the device. It selects the GPU, allocates all the memory needed to perform the inverse pfb process and copies the prototype filter
@@ -65,7 +79,7 @@ void initDevice(const float * taps){
         	size_t mem_tot = 0;
 	        size_t mem_free = 0;
 	        cudaMemGetInfo  (&mem_free, & mem_tot);
-        	printf("Chosen GPU Statistics\n---------------------------------------------------------\n");
+        	printf("---------------------------------------------------------\n\033[0;31mChosen GPU Statistics\033[0m\n---------------------------------------------------------\n");
 	        printf("%s, device %d on PCI Bus #%d, clocked at %f GHz\n",properties.name,properties.pciDeviceID,
         	        properties.pciBusID,properties.clockRate / 1000000.0);
 	        printf("Compute capability %d.%d with %f GiB global memory (%f GiB free)\n",properties.major,
@@ -82,7 +96,7 @@ void initDevice(const float * taps){
 	  Weighted Window Overlap Add method. TODO: One optimization trick that one may try is to copy this into texture memory
 	  where there may be a slight performance increase due to the texture caching properties of the GPU.
 	*/
-	printf("INIT: Copying prototype filter of %d taps to device\n",WINDOW_LENGTH);
+	printf("\033[0;31mInitialization routines\033[0m\n---------------------------------------------------------\nINIT: Copying prototype filter of %d taps to device\n",WINDOW_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_taps,sizeof(float)*WINDOW_LENGTH));
 	cudaSafeCall(cudaMemcpy(d_taps,taps,sizeof(float)*WINDOW_LENGTH,cudaMemcpyHostToDevice));
 	/*
@@ -101,19 +115,21 @@ void initDevice(const float * taps){
         //reserve memory for output (this should be BATCH * N real samples long)
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",max_no_blocks,N);
         cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(float) * (max_no_blocks*N)));
+	printf("---------------------------------------------------------\n");
 }
 /**
  Deallocates any memory associated with the inverse pfb process from the device.
  @precondition device should have been initialized before this method is called
 */
 void releaseDevice(){
+	printf("\033[0;31mAll done, releasing device\033[0m\n---------------------------------------------------------\n");
 	cudaSafeCall(cudaFree(d_taps));
 	cudaSafeCall(cudaFree(d_ifft_output));
 	cudaSafeCall(cudaFree(d_ifft_input));
         cudaSafeCall(cudaFree(d_filtered_output));
 	cufftSafeCall(cufftDestroy(ifft_plan));
 	cudaDeviceReset(); //leave the device in a safe state
-	printf("DEINIT: Device safely released\n");
+	printf("DEINIT: Device safely released\n---------------------------------------------------------\n");
 }
 
 /**
@@ -159,7 +175,7 @@ device once off before processing starts and tairing down the memory allocations
 void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride){
 	assert(no_blocks_in_stride <= LOOP_LENGTH/(N/2+1)); //this is the maximum number of blocks we can sent to the GPU
 	//copy everything in this stride into the device ifft input vector
-	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride);
+	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride,FFT_SIZE);
         cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_float) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
@@ -239,69 +255,3 @@ __global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t star
 	uint32_t tI = blockIdx.x*blockDim.x + threadIdx.x;
 	ifft_array[tI] = ifft_array[start_of_last_P_N_block + tI];
 } 
-
-
-/**
-TODO: THIS IS FOR DEBUGGING PURPOSES ONLY... the real input data should not have redundant samples!
-*/
-
-void cutDuplicatesFromData(const complex_float * in, complex_float * out, uint32_t orig_count){
-	assert(orig_count % N == 0); //only whole blocks should be processed
-	for (uint32_t i = 0; i < orig_count; i += N){
-		memcpy(out + (i/N)*(N/2 + 1), in + i, (N/2 + 1) * sizeof(complex_float));
-	}
-}
-
-int main ( int argc, char ** argv ){
-	char * taps_filename;
-	char * pfb_output_filename;
-	char * output_filename;
-	uint32_t num_samples;
-	if (argc != 5){
-		fprintf(stderr, "expected arguements: 'prototype_filter_file' 'no_complex_to_read' 'pfb_output_file' 'output_file'\n");
-		return 1;
-	}	
-	taps_filename = argv[1];
-	num_samples = atoi(argv[2]);
-	pfb_output_filename = argv[3];
-	output_filename = argv[4];
-	printf("Performing operation on %d samples from '%s'\n",num_samples,pfb_output_filename);
-	
-	//Read in taps file (prototype filter)	
-	float * taps = (float*) malloc(sizeof(float)*WINDOW_LENGTH);
-	if (readDataFromDisk(taps_filename,sizeof(float),WINDOW_LENGTH,taps) != WINDOW_LENGTH){
-		fprintf(stderr, "Prototype filter has to be %d long\n",WINDOW_LENGTH);
-		return 1;
-	}
-	
-	//Read in input file (output of earlier pfb process, so these will be complex numbers
-	complex_float * pfb_data = (complex_float*) malloc(sizeof(complex_float)*(num_samples)); //pad the array with N*P positions
-	if (readDataFromDisk(pfb_output_filename,sizeof(complex_float),num_samples,pfb_data) != num_samples){
-		fprintf(stderr, "input pfb data does not contain %d samples\n", num_samples);
-		return 1;
-	}
-
-	//Format the data into N/2 + 1 sized chunks to cut away unnecessary samples for the IFFT
-	uint32_t trimmed_input_length = (N/2+1)*(num_samples / N);
-	complex_float * trimmed_pfb_data = (complex_float*) malloc(sizeof(complex_float)*trimmed_input_length);
-	cutDuplicatesFromData(pfb_data,trimmed_pfb_data,num_samples);
-
-	//Setup the device and copy the taps
-	initDevice(taps);
-	float * output = (float*) malloc(sizeof(float)*num_samples);
-	
-	//do some processing
-	uint32_t stride_length_in_blocks = num_samples / N;
-	processNextStride(trimmed_pfb_data, output, stride_length_in_blocks);	
-        writeDataToDisk(output_filename,sizeof(float),num_samples,output);
-	
-	//release the device
-	releaseDevice();
-
-	//free any hostside memory:
-	free(output);
-	free(pfb_data);
-	free(taps);
-	free(trimmed_pfb_data);	
-	printf("Application Terminated Normally\n");
-}
