@@ -6,8 +6,8 @@ Created on Jan 30, 2014
 from pylab import *
 import sys
 import scipy.signal
-if len(sys.argv) != 5:
-        print "please specify [input file 1], [input file 2], [whether input file 1 is 'complex'/'real'] and [whether input file 2 is 'complex'/'real']"
+if len(sys.argv) != 6:
+        print "please specify [input file 1], [input file 2], [whether input file 1 is 'complex'/'real'], [whether input file 2 is 'complex'/'real'] and [whether to skip correlation and only plot '0'/'1']"
         sys.exit(1)
         
 if sys.argv[3] == "real":
@@ -43,9 +43,9 @@ elif sys.argv[4] == "complex":
     plot(np.imag(inp2))
 else:
     print "Invalid datatype specification argument 4 should be either 'complex' or 'real'"    
-    
-xc = scipy.signal.correlate(inp1,inp2)
-figure(3)
-title("Cross correlation between %s and %s" % (sys.argv[1],sys.argv[2]))
-plot(xc)
+if int(sys.argv[5]) == 0:
+	xc = scipy.signal.correlate(inp1,inp2)
+	figure(3)
+	title("Cross correlation between %s and %s" % (sys.argv[1],sys.argv[2]))
+	plot(xc)
 show()

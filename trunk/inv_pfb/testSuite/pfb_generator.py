@@ -33,7 +33,7 @@ pfb_filtered_output = np.zeros(no_samples).astype(np.float32)
 pfb_output = np.zeros(no_samples).astype(np.complex64)
 for lB in range(0,no_samples,N):
     pfb_filtered_output[lB:lB+N] = (pfb_input[lB:lB+(P*N)].reshape(P,N)*w).sum(axis=0)
-    pfb_output[lB:lB+N] = np.fft.fft(pfb_filtered_output[lB:lB+N])
+    pfb_output[lB:lB+N] = np.fft.fft(pfb_filtered_output[lB:lB+N]) / N 
        
 print ">>>Computing the comparison unfiltered SFFT"
 '''
