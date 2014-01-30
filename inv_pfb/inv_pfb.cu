@@ -276,18 +276,16 @@ int main ( int argc, char ** argv ){
 	
 	//Read in input file (output of earlier pfb process, so these will be complex numbers
 	complex_float * pfb_data = (complex_float*) malloc(sizeof(complex_float)*(num_samples)); //pad the array with N*P positions
-
 	if (readDataFromDisk(pfb_output_filename,sizeof(complex_float),num_samples,pfb_data) != num_samples){
 		fprintf(stderr, "input pfb data does not contain %d samples\n", num_samples);
 		return 1;
 	}
+
 	//Format the data into N/2 + 1 sized chunks to cut away unnecessary samples for the IFFT
 	uint32_t trimmed_input_length = (N/2+1)*(num_samples / N);
 	complex_float * trimmed_pfb_data = (complex_float*) malloc(sizeof(complex_float)*trimmed_input_length);
 	cutDuplicatesFromData(pfb_data,trimmed_pfb_data,num_samples);
-	#ifdef DUMP_TRIMMED_DATA
-		writeDataToDisk(TRIMMED_DATA_OUTPUT_FILE,sizeof(complex_float),trimmed_input_length,trimmed_pfb_data);
-	#endif
+
 	//Setup the device and copy the taps
 	initDevice(taps);
 	float * output = (float*) malloc(sizeof(float)*num_samples);
@@ -295,7 +293,7 @@ int main ( int argc, char ** argv ){
 	//do some processing
 	uint32_t stride_length_in_blocks = num_samples / N;
 	processNextStride(trimmed_pfb_data, output, stride_length_in_blocks);	
-        writeDataToDisk(output_filename,sizeof(float),num_samples-PAD,output+PAD);
+        writeDataToDisk(output_filename,sizeof(float),num_samples,output);
 	
 	//release the device
 	releaseDevice();
