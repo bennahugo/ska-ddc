@@ -3,8 +3,8 @@
 # This is an example script
 #
 #These commands set up the Grid Environment for your job:
-#PBS -N SKA__DDC
-#PBS -l nodes=gpu001:ppn=16:seriesGPU,walltime=00:01:00
+#PBS -N SKA__PFB
+#PBS -l nodes=srvslsgpu002:ppn=1:seriesGPU,walltime=00:01:00
 #PBS -q GPUQ
 #
 
@@ -18,4 +18,4 @@ echo "Script started at "$(date)
 echo ""
 echo "Running on: $(hostname)"
 echo "-----------------------------------------------------------------------"
-/home/bhugo/ska-res/ska-ddc/inv_pfb/build/inv_pfb /home/bhugo/ska-res/ska-ddc/inv_pfb/fir_pfb_prototype_512x8.dat 8192 /home/bhugo/ska-res/ska-ddc/inv_pfb/pfb_noise_8_x_512_complex.dat /home/bhugo/ska-res/ska-ddc/inv_pfb/pfb_inv_noise_c_ver.dat 
+/home/bhugo/ska-res/ska-ddc/inv_pfb/build/inv_pfb /home/bhugo/ska-res/ska-ddc/inv_pfb/data_out/prototype_FIR.dat 12288 /home/bhugo/ska-res/ska-ddc/inv_pfb/data_out/pfb.dat /home/bhugo/ska-res/ska-ddc/inv_pfb/pfb_inv_noise_c_ver.dat 

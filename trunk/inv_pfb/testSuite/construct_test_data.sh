@@ -2,7 +2,7 @@
 N=512
 P=8
 num_samples_to_use=`expr $N \* $P \* 3`
-output_directory=/scratch/bhugo/data_out
+output_directory=../data_out
 tone_type=noise
 
 if [ -d "$output_directory" ]; then
