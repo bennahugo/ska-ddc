@@ -30,9 +30,9 @@ const uint32_t BUFFER_LENGTH = LOOP_LENGTH / FFT_SIZE * N + PAD; //Number of ele
  necessary typedefs
 *****************************************************************************************************************/
 typedef struct {
-        float r;
-        float i;
-} complex_float;
+        int8_t r;
+        int8_t i;
+} complex_int8;
 
 /****************************************************************************************************************
  CUDA error handling macros
@@ -59,5 +59,5 @@ inline void __cufftSafeCall( uint32_t err, const char *file, const int line ){
 *****************************************************************************************************************/
 void initDevice(const float * taps);
 void releaseDevice();
-void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride = LOOP_LENGTH/(N/2+1));
+void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint32_t no_blocks_in_stride = LOOP_LENGTH/(N/2+1));
 #endif //ifndef INV_PFB_H

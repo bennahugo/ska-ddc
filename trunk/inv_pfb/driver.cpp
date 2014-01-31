@@ -53,7 +53,7 @@ int main ( int argc, char ** argv ){
         char * output_filename;
         uint32_t num_samples;
         if (argc != 4){
-                fprintf(stderr, "expected arguements: 'prototype_filter_file' 'pfb_output_file' 'output_file'\n");
+                fprintf(stderr, "expected arguements: 'prototype_filter_file' 'ipfb_input_file' 'output_file'\n");
                 return 1;
         }
         taps_filename = argv[1];
@@ -63,8 +63,8 @@ int main ( int argc, char ** argv ){
 	struct stat st;
 	stat(pfb_output_filename, &st);
 	uint32_t input_file_size = st.st_size; //in bytes
-	assert(input_file_size % sizeof(complex_float) == 0); //ensure we're at least dealing with a file that can be interpreted as a file of complex 32-bit floating point numbers
-        num_samples = input_file_size / sizeof(complex_float);
+	assert(input_file_size % sizeof(complex_int8) == 0); //ensure we're at least dealing with a file that can be interpreted as a file of complex 8-bit ints
+        num_samples = input_file_size / sizeof(complex_int8);
 	assert(num_samples % FFT_SIZE == 0); //ensure we're only processing an integral number of non-redundant real FFT samples
         printf("Performing operation on %d blocks of complex non-redundant FFT samples (total of %d complex elements) from '%s'\n",num_samples/FFT_SIZE,num_samples,pfb_output_filename);
 
@@ -76,16 +76,16 @@ int main ( int argc, char ** argv ){
         }
 
         //Read in input file (output of earlier pfb process, so these will be complex numbers
-        complex_float * pfb_data = (complex_float*) malloc(sizeof(complex_float)*(num_samples));
-        if (readDataFromDisk(pfb_output_filename,sizeof(complex_float),num_samples,pfb_data) != num_samples){
+        complex_int8 * pfb_data = (complex_int8*) malloc(sizeof(complex_int8)*(num_samples));
+        if (readDataFromDisk(pfb_output_filename,sizeof(complex_int8),num_samples,pfb_data,0) != num_samples){
                 fprintf(stderr, "input pfb data does not contain %d non-redundant samples\n", num_samples);
                 return 1;
 	}
-
+	
         //Setup the device and copy the taps
         initDevice(taps);
 	uint32_t ipfb_output_size = (num_samples / FFT_SIZE) * N; //The iPFB process produces blocks of size N
-        float * output = (float*) malloc(sizeof(float)*ipfb_output_size);
+        int8_t * output = (int8_t*) malloc(sizeof(int8_t)*ipfb_output_size);
 
         //do some processing
 	printf("\033[0;31mProcessing starting\033[0m\n---------------------------------------------------------\n%d non-redundant samples in the input data\n",num_samples);
@@ -96,7 +96,7 @@ int main ( int argc, char ** argv ){
 		uint32_t num_blocks_to_process = ((uint32_t)fmin(num_samples - i * LOOP_LENGTH,LOOP_LENGTH)) / FFT_SIZE; 
 		printf("\033[0;32mExecuting loop %d/%d. Processing %d blocks of size %d complex numbers\033[0m\n\n",i+1,num_loops,num_blocks_to_process,FFT_SIZE);
 	        processNextStride(pfb_data + (i * LOOP_LENGTH), output, num_blocks_to_process);
-        	writeDataToDisk(output_filename,sizeof(float),num_blocks_to_process*N,output,i == 0);
+        	writeDataToDisk(output_filename,sizeof(int8_t),num_blocks_to_process*N,output,i == 0);
 	}
 	printf("---------------------------------------------------------\n");
         //release the device
