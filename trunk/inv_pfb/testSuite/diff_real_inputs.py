@@ -15,8 +15,8 @@ if len(sys.argv) != 3:
         print "please specify [input file 1], [input file 2]"
         sys.exit(1)
         
-inp1 = np.fromfile(sys.argv[1],dtype=np.float32)
-inp2 = np.fromfile(sys.argv[2],dtype=np.float32)
+inp1 = np.fromfile(sys.argv[1],dtype=np.int8).astype(np.float32)
+inp2 = np.fromfile(sys.argv[2],dtype=np.int8).astype(np.float32)
 inp1_mean = np.mean(inp1)
 inp2_mean = np.mean(inp2)
 inp1_stdev = np.std(inp1)

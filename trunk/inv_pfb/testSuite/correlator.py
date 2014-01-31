@@ -11,12 +11,12 @@ if len(sys.argv) != 6:
         sys.exit(1)
         
 if sys.argv[3] == "real":
-    inp1 = np.fromfile(sys.argv[1],dtype=np.float32)
+    inp1 = np.fromfile(sys.argv[1],dtype=np.int8).astype(np.float32)
     figure(1)
     title(sys.argv[1])
     plot(inp1)
 elif sys.argv[3] == "complex":
-    inp1 = np.fromfile(sys.argv[1],dtype=np.complex64)
+    inp1 = np.fromfile(sys.argv[1],dtype=np.int8).astype(np.float32).view(dtype=np.complex64)
     figure(1)
     subplot(211)
     title(sys.argv[1]+".real")
@@ -28,12 +28,12 @@ else:
     print "Invalid datatype specification argument 3 should be either 'complex' or 'real'"
 
 if sys.argv[4] == "real":
-    inp2 = np.fromfile(sys.argv[2],dtype=np.float32)
+    inp2 = np.fromfile(sys.argv[2],dtype=np.int8).astype(np.float32)
     figure(2)
     title(sys.argv[2])
     plot(inp2)
 elif sys.argv[4] == "complex":
-    inp2 = np.fromfile(sys.argv[2],dtype=np.complex64)
+    inp2 = np.fromfile(sys.argv[2],dtype=np.int8).astype(np.float32).view(dtype=np.complex64)
     figure(2)
     subplot(211)
     title(sys.argv[2]+".real")
