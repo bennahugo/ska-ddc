@@ -132,18 +132,6 @@ void releaseDevice(){
 	printf("DEINIT: Device safely released\n---------------------------------------------------------\n");
 }
 
-//TODO:REMOVE THIS:
-uint32_t writeDataToDiskTEMP(const char * filename, uint32_t element_size, uint32_t length, const void * buffer, bool blankfile){
-        FILE * hnd = fopen(filename, blankfile ? "w" : "a");
-        uint32_t elemsWrote = 0;
-        if (hnd != NULL){
-                elemsWrote = fwrite(buffer,element_size,length,hnd);
-                fclose(hnd);
-        }
-        return elemsWrote;
-}
-
-
 /**
 This method computes the inverse polyphase filter bank (pfb) operation (Weighted Window Overlap Add method) on a subset ("stride") 
 of the output of a previous forward pfb operation.
@@ -192,14 +180,7 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
 	{
-		cufftSafeCall(cufftExecC2R(ifft_plan,d_ifft_input,d_ifft_output + PAD));
-		
-		//TODO: remove this:
-		float * ifft_out = (float *)malloc(sizeof(float)*(no_blocks_in_stride * N + PAD));
-		
-		cudaSafeCall(cudaMemcpy(ifft_out,d_ifft_output, sizeof(cufftReal) * (no_blocks_in_stride * N + PAD),cudaMemcpyDeviceToHost));
-		writeDataToDiskTEMP("/home/bhugo/ska-res/ska-ddc/inv_pfb/IFFTedStuff_c.dump",sizeof(float),no_blocks_in_stride * N + PAD,ifft_out,true);
-		free(ifft_out);	
+		cufftSafeCall(cufftExecC2R(ifft_plan,d_ifft_input,d_ifft_output + PAD));	
 	}
 	cudaThreadSynchronize();
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);

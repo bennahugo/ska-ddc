@@ -41,6 +41,7 @@ for computational efficiency invert every FFT from the forward process only once
 we'll need a ring buffer to store the previous IFFTs
 '''
 for lB in range(0,no_samples,N):
+    #reverse the scaling factor (Parseval's Theorem) that we had to add in the forward python PFB to make it compatible with the CUDA real IFFT implementation
     pfb_inverse_ifft_output[lB+pad:lB+pad+N] = np.real(np.fft.ifft(pfb_output[lB:lB+N] * N))
 
 '''
@@ -49,17 +50,6 @@ See discussion in ipfb GPU code
 '''
 for lB in range(0,no_samples,N): 
     pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
-'''
-w_i = w_i.reshape(P*N)
-for l in range(0,no_samples,N):
-        for n in range(0,N):
-                accum = pfb_inverse_ifft_output[l+n]*w_i[N - n - 1]
-                for p in range(1, P):
-                        accum += pfb_inverse_ifft_output[l+n+p*N]*w_i[p*N + (N - n - 1)]
-		pfb_inverse_output[l+n] = accum
-                #endfor
-        #endfor
-#endfor
-'''
+
 pfb_inverse_output.astype(np.float32).tofile(out_file)
 pfb_inverse_ifft_output.astype(np.float32).tofile(ifft_out_file)
