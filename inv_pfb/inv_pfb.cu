@@ -31,6 +31,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "inv_pfb.h"
 /****************************************************************************************************************
+Memory allocation constants.
+DO NOT EDIT UNLESS ESSENTIAL
+
+Compute how much padding we must add to the ifft output and the pfb output buffers to obtain a branchless kernel. This
+is necessary when we want to address more than 65535 on compute capability 2.0 blocks in a single kernel call. We accomodate this problem by 
+splitting the blocks over a 2D grid. Now we should be able to address 65535 * 65535 on compute capability 2.0
+*****************************************************************************************************************/
+const uint32_t MAX_NO_BLOCKS = LOOP_LENGTH/FFT_SIZE;
+const uint32_t PADDED_NO_BLOCKS_IN_EACH_DIMENSION = (uint32_t)ceil(sqrt(MAX_NO_BLOCKS));
+const uint32_t KERNEL_BRANCH_AVOIDANCE_PADDING = (PADDED_NO_BLOCKS_IN_EACH_DIMENSION *
+						  PADDED_NO_BLOCKS_IN_EACH_DIMENSION - MAX_NO_BLOCKS)*N*P;
+
+/****************************************************************************************************************
  variables
 *****************************************************************************************************************/
 cufftReal * d_ifft_output;
@@ -42,7 +55,7 @@ float * d_filtered_output;
 /****************************************************************************************************************
 Forward declare kernels
 ****************************************************************************************************************/
-__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter);
+__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter, uint32_t no_blocks_in_dim);
 __global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block);
 
 /**
@@ -99,22 +112,26 @@ void initDevice(const float * taps){
 	printf("\033[0;31mInitialization routines\033[0m\n---------------------------------------------------------\nINIT: Copying prototype filter of %d taps to device\n",WINDOW_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_taps,sizeof(float)*WINDOW_LENGTH));
 	cudaSafeCall(cudaMemcpy(d_taps,taps,sizeof(float)*WINDOW_LENGTH,cudaMemcpyHostToDevice));
+
 	/*
 	 Setup the ifft buffer where we will keep P extra IFFTs (each of length N) carried over
 	 from the previous stride-processing iteration.
 	*/
-	printf("INIT: Setting up IFFT output buffer of length %d\n", BUFFER_LENGTH);
-	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH)));
+	printf("INIT: Adding branch avoidance padding of %d 32-bit floating point values to the IFFT output and iPfb output\n",KERNEL_BRANCH_AVOIDANCE_PADDING);
+	printf("INIT: Setting up IFFT output buffer of length %d (excluding branch avoidance padding)\n", BUFFER_LENGTH);
+	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH + KERNEL_BRANCH_AVOIDANCE_PADDING)));
+	
 	//Setup CU IFFT plan to process all the N-sample iffts contained in a single loop, in one go
-	uint32_t max_no_blocks = LOOP_LENGTH/FFT_SIZE;
-	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",max_no_blocks);
-        cufftSafeCall(cufftPlan1d(&ifft_plan, N,  CUFFT_C2R, max_no_blocks));
+	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",MAX_NO_BLOCKS);
+        cufftSafeCall(cufftPlan1d(&ifft_plan, N,  CUFFT_C2R, MAX_NO_BLOCKS));
+	
 	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) samples long (consisting of complex numbers)
-	printf("INIT: Setting up IFFT input vector for %d blocks of FFTs, each with %d non-redundant samples\n",max_no_blocks,FFT_SIZE);
-        cudaSafeCall(cudaMalloc((void**)&d_ifft_input,sizeof(cufftComplex) * (FFT_SIZE * max_no_blocks)));
-        //reserve memory for output (this should be BATCH * N real samples long)
-	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",max_no_blocks,N);
-        cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(float) * (max_no_blocks*N)));
+	printf("INIT: Setting up IFFT input vector for %d blocks of FFTs, each with %d non-redundant samples\n",MAX_NO_BLOCKS,FFT_SIZE);
+        cudaSafeCall(cudaMalloc((void**)&d_ifft_input,sizeof(cufftComplex) * (FFT_SIZE * MAX_NO_BLOCKS)));
+        
+	//reserve memory for output (this should be BATCH * N real samples long)
+	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
+        cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(float) * (MAX_NO_BLOCKS*N + KERNEL_BRANCH_AVOIDANCE_PADDING)));
 	printf("---------------------------------------------------------\n");
 }
 /**
@@ -186,9 +203,14 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);
 	//now do the inverse filtering
 	{
-		dim3 threadsPerBlock(N,1,1);
-		dim3 numBlocks(no_blocks_in_stride,1,1);
-		ipfb<<<numBlocks,threadsPerBlock,0>>>(d_ifft_output,d_filtered_output,d_taps);
+		/*split the threads over a 2-D block which we in turn will place in a 2-D grid... this is to get past 
+		  indexing restrictions (especially on older GPUs).  We're catering for a minimum of Compute Capability 2.0 here,
+		  which can cater only for 65535 blocks per dimension.
+		*/
+		dim3 threads_per_block(N,1,1);
+		uint32_t no_blocks_in_dim = (uint32_t)ceil(sqrt(no_blocks_in_stride));
+		dim3 no_blocks_per_grid(no_blocks_in_dim,no_blocks_in_dim,1);
+		ipfb<<<no_blocks_per_grid,threads_per_block,0>>>(d_ifft_output,d_filtered_output,d_taps,no_blocks_in_dim);
 	
 		cudaThreadSynchronize();
 		cudaError code = cudaGetLastError();
@@ -200,9 +222,9 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 	printf("Moving %d IFFT samples from position %d of the IFFT persistant buffer to index 0 of the buffer.\n",N * P,N * no_blocks_in_stride);
 	//move the last PAD samples in the ifft output array to the front of the ifft output array for processing the next stride of elements:
 	{
-		dim3 threadsPerBlock(N,1,1);
-		dim3 numBlocks(P,1,1);
-		move_last_P_iffts_to_front<<<numBlocks,threadsPerBlock,0>>>(d_ifft_output, N * no_blocks_in_stride);
+		dim3 threads_per_block(N,1,1);
+		dim3 no_blocks(P,1,1);
+		move_last_P_iffts_to_front<<<no_blocks,threads_per_block,0>>>(d_ifft_output, N * no_blocks_in_stride);
 	
 		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly
 	        cudaError code = cudaGetLastError();
@@ -218,7 +240,9 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 
 /**
 This kernel computes the filter bank operation of the inverse Polyphase Filter Bank (Weighted Window Overlap Add method). 
-The kernel should be invoked with blockDim = N and numBlocks = number_of_blocks_in_stride.
+
+The kernel should be invoked with blockDim = [N,1,1] and 
+numBlocks = [ceil(sqrt(number_of_blocks_in_stride)),ceil(sqrt(number_of_blocks_in_stride)),1].
 
 It will perform the following filterbank algorithm:
 for (l = 0; l < stride_length; l += N) in parallel
@@ -236,14 +260,19 @@ the commutator technically runs in reverse as well, meaning that we should flip 
 each y[n] in forward or reverse does not matter. It should be clear that if the 3rd loop is run backwards with the the initialization of the 
 accumulation set to a position in the last subfilter the result should remain the same.
 */
-__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter){
-	uint32_t lB = blockIdx.x * N;
-	uint32_t filter_index = N - threadIdx.x - 1;
-	register float accum = input[lB + threadIdx.x]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
+__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter, uint32_t no_blocks_in_dim){
+	/*This block indexing scheme is to ensure we can process more than 65535 blocks in total on older architectures
+	  as discussed earlier.
+	*/
+	uint32_t lB = blockIdx.x * N + blockIdx.y * no_blocks_in_dim * N;
+	uint32_t n = threadIdx.x;
+
+	uint32_t filter_index = N - n - 1;
+	register float accum = input[lB + n]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
 	#pragma unroll
 	for (uint32_t p = 1; p < P; ++p)
-		accum += input[lB + threadIdx.x + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
-	output[lB + threadIdx.x] = accum;
+		accum += input[lB + n + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
+	output[lB + n] = accum;
 }
 
 /**
