@@ -31,17 +31,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "inv_pfb.h"
 /****************************************************************************************************************
-Memory allocation constants.
+Primarily memory allocation constants.
 DO NOT EDIT UNLESS ESSENTIAL
+*****************************************************************************************************************/
 
-Compute how much padding we must add to the ifft output and the pfb output buffers to obtain a branchless kernel. This
+/*Compute how much padding we must add to the ifft output and the pfb output buffers to obtain a branchless kernel. This
 is necessary when we want to address more than 65535 on compute capability 2.0 blocks in a single kernel call. We accomodate this problem by 
 splitting the blocks over a 2D grid. Now we should be able to address 65535 * 65535 on compute capability 2.0
-*****************************************************************************************************************/
+*/
 const uint32_t MAX_NO_BLOCKS = LOOP_LENGTH/FFT_SIZE;
 const uint32_t PADDED_NO_BLOCKS_IN_EACH_DIMENSION = (uint32_t)ceil(sqrt(MAX_NO_BLOCKS));
 const uint32_t KERNEL_BRANCH_AVOIDANCE_PADDING = (PADDED_NO_BLOCKS_IN_EACH_DIMENSION *
 						  PADDED_NO_BLOCKS_IN_EACH_DIMENSION - MAX_NO_BLOCKS)*N*P;
+
+/*Block size of the int8 to cufftReal casting kernel. 256 threads per block seem to be a magic number in CUDA that works 
+well accross different generations of cards.
+*/
+const uint16_t CASTING_THREADS_PER_BLOCK = 256;
 
 /****************************************************************************************************************
  variables
@@ -50,14 +56,14 @@ cufftReal * d_ifft_output;
 float * d_taps;
 cufftHandle ifft_plan;
 cufftComplex * d_ifft_input;
-float * d_filtered_output;
+int8_t * d_filtered_output;
 
 /****************************************************************************************************************
 Forward declare kernels
 ****************************************************************************************************************/
-__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter, uint32_t no_blocks_in_dim);
+__global__ void array_cast_int8_to_cufftReal(int8_t * in, cufftReal * out, uint32_t total_no_samples_casted_by_this_kernel);
+__global__ void ipfb(const cufftReal * input,  int8_t * output, const float * prototype_filter, uint32_t no_blocks_in_dim);
 __global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block);
-
 /**
 This method initializes the device. It selects the GPU, allocates all the memory needed to perform the inverse pfb process and copies the prototype filter
 onto the device. ***WARNING***: this method must be called before the first stride is processed. The device should be released after all processing is completed.
@@ -117,7 +123,7 @@ void initDevice(const float * taps){
 	 Setup the ifft buffer where we will keep P extra IFFTs (each of length N) carried over
 	 from the previous stride-processing iteration.
 	*/
-	printf("INIT: Adding branch avoidance padding of %d 32-bit floating point values to the IFFT output and iPfb output\n",KERNEL_BRANCH_AVOIDANCE_PADDING);
+	printf("INIT: Adding branch avoidance padding of %d elements to the IFFT output and iPfb output\n",KERNEL_BRANCH_AVOIDANCE_PADDING);
 	printf("INIT: Setting up IFFT output buffer of length %d (excluding branch avoidance padding)\n", BUFFER_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH + KERNEL_BRANCH_AVOIDANCE_PADDING)));
 	
@@ -131,7 +137,7 @@ void initDevice(const float * taps){
         
 	//reserve memory for output (this should be BATCH * N real samples long)
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
-        cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(float) * (MAX_NO_BLOCKS*N + KERNEL_BRANCH_AVOIDANCE_PADDING)));
+        cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(uint8_t) * (MAX_NO_BLOCKS*N + KERNEL_BRANCH_AVOIDANCE_PADDING)));
 	printf("---------------------------------------------------------\n");
 }
 /**
@@ -189,11 +195,29 @@ device once off before processing starts and tairing down the memory allocations
 	equal to LOOP_LENGTH/(N/2+1)
 @precondition call initDevice BEFORE calling this method
 */
-void processNextStride(const complex_float * input, float * output_buffer, uint32_t no_blocks_in_stride){
+void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint32_t no_blocks_in_stride){
 	assert(no_blocks_in_stride <= LOOP_LENGTH/(N/2+1)); //this is the maximum number of blocks we can sent to the GPU
 	//copy everything in this stride into the device ifft input vector
 	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride,FFT_SIZE);
-        cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_float) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
+	{        
+		cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_int8) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
+	}
+	printf("Casting FFT data from int8 samples to 32-bit floating point samples\n");
+	{
+		dim3 threads_per_block(CASTING_THREADS_PER_BLOCK,1,1);
+		uint32_t no_samples_to_cast = no_blocks_in_stride * FFT_SIZE * 2; //casting to a 64-bit complex number so there should be 2 32-bit casts
+                //uint32_t no_blocks_in_dim = (uint32_t)ceil(sqrt(no_blocks_in_stride)); //TODO: make this a 2D indexing scheme!!!
+		uint32_t no_blocks = (uint32_t)ceil(no_samples_to_cast / (float) CASTING_THREADS_PER_BLOCK);
+                dim3 no_blocks_per_grid(no_blocks,1,1);
+                array_cast_int8_to_cufftReal<<<no_blocks_per_grid,threads_per_block,0>>>((int8_t*)d_ifft_input,(cufftReal*)d_ifft_input,no_samples_to_cast);
+
+                cudaThreadSynchronize();
+                cudaError code = cudaGetLastError();
+                if (code != cudaSuccess){
+                        fprintf (stderr,"Error while executing gpu casting operation -- %s\n", cudaGetErrorString(code));
+                        exit(-1);
+                }
+	}
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
 	{
@@ -229,13 +253,21 @@ void processNextStride(const complex_float * input, float * output_buffer, uint3
 		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly
 	        cudaError code = cudaGetLastError();
         	if (code != cudaSuccess){
-                	fprintf (stderr,"Error while executing inverse pfb -- %s\n", cudaGetErrorString(code));
+                	fprintf (stderr,"Error while executing moving last N*P IFFTs -- %s\n", cudaGetErrorString(code));
                 	exit(-1);
 		}
 	}
 	//copy N-sized chunks to the output array:
 	printf("Finished inverse pdb on stride, copying %d blocks, each of %d elements from the device\n",no_blocks_in_stride,N);
-	cudaMemcpy(output_buffer, d_filtered_output,sizeof(float)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost);
+	cudaSafeCall(cudaMemcpy(output_buffer, d_filtered_output,sizeof(int8_t)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost));
+}
+//ASAP TODO: add decent comment here
+__global__ void array_cast_int8_to_cufftReal(int8_t * in, cufftReal * out, uint32_t total_no_samples_casted_by_this_kernel){
+	register uint32_t tI = blockIdx.x*blockDim.x + threadIdx.x; //TODO: convert this indexing scheme to a 2D one
+	if (tI < total_no_samples_casted_by_this_kernel){ //ASAP TODO: remove this through padding
+	        register uint32_t reversed_index = total_no_samples_casted_by_this_kernel - tI - 1;
+		out[reversed_index] = (cufftReal) in[reversed_index];
+	}
 }
 
 /**
@@ -260,19 +292,19 @@ the commutator technically runs in reverse as well, meaning that we should flip 
 each y[n] in forward or reverse does not matter. It should be clear that if the 3rd loop is run backwards with the the initialization of the 
 accumulation set to a position in the last subfilter the result should remain the same.
 */
-__global__ void ipfb(const cufftReal * input,  float * output, const float * prototype_filter, uint32_t no_blocks_in_dim){
+__global__ void ipfb(const cufftReal * input,  int8_t * output, const float * prototype_filter, uint32_t no_blocks_in_dim){
 	/*This block indexing scheme is to ensure we can process more than 65535 blocks in total on older architectures
 	  as discussed earlier.
 	*/
-	uint32_t lB = blockIdx.x * N + blockIdx.y * no_blocks_in_dim * N;
-	uint32_t n = threadIdx.x;
-
-	uint32_t filter_index = N - n - 1;
+	register uint32_t lB = blockIdx.x * N + blockIdx.y * no_blocks_in_dim * N; //TODO: optimize this
+	register uint32_t n = threadIdx.x;
+	register uint32_t filter_index = N - n - 1;
+	
 	register float accum = input[lB + n]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
 	#pragma unroll
 	for (uint32_t p = 1; p < P; ++p)
 		accum += input[lB + n + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
-	output[lB + n] = accum;
+	output[lB + n] = (int8_t)accum;
 }
 
 /**
@@ -282,6 +314,6 @@ to call this kernel after the ipfb kernel has fully completed to ensure that the
 The kernel should be invoked with blockDim = N and numBlocks = P
 */
 __global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block){
-	uint32_t tI = blockIdx.x*blockDim.x + threadIdx.x;
+	register uint32_t tI = blockIdx.x*blockDim.x + threadIdx.x;
 	ifft_array[tI] = ifft_array[start_of_last_P_N_block + tI];
 } 
