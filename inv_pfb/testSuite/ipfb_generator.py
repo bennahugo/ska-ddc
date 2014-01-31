@@ -22,7 +22,7 @@ fft_non_redundant = N / 2 + 1 #N/2+1 of non-redundant samples in a real fft by t
 assert(no_samples % fft_non_redundant == 0) #ensure we're only inverting an integral number of FFTs (with only non-redundant samples)
 ipfb_output_size = (no_samples/fft_non_redundant)*N
 
-pfb_output = np.fromfile(in_file,dtype=np.complex64)
+pfb_output = np.fromfile(in_file,dtype=np.int8).astype(np.float32).view(np.complex64)
 w = np.fromfile(filter_file,dtype=np.float32).reshape(P,N)
 
 '''
@@ -57,5 +57,5 @@ See discussion in ipfb GPU code
 for lB in range(0,ipfb_output_size,N): 
     pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
 
-pfb_inverse_output.astype(np.float32).tofile(out_file)
-pfb_inverse_ifft_output.astype(np.float32).tofile(ifft_out_file)
+pfb_inverse_output.astype(np.float32).astype(np.int8).tofile(out_file)
+pfb_inverse_ifft_output.astype(np.float32).astype(np.int8).tofile(ifft_out_file)

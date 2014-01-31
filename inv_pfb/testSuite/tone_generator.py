@@ -31,17 +31,19 @@ generate a fake tone
 print ">>>Generating tone"
 tone = np.zeros(no_samples).astype(np.float32) # make sure the tone is a 32bit float tone
 if tone_generation_mode == "sine":
+    scale_factor = 1/len(tone_freq) #normalization factor
     for f in tone_freq:
-        for n in np.arange(0,no_samples):
-            tone[n] += np.sin(2 * np.pi * n * (f / float(sampling_freq)))
+        tone += scale_factor * np.sin(2 * np.pi * np.arange(0,no_samples) * (f / float(sampling_freq)))
         print "frequency %f MHz should be in channel %f after filtering" % (f / float(1e6),f / (max_freq / float(no_bins)))
+    tone *= 127 #scale to fill signed 8bit integer output
 elif tone_generation_mode == "noise":
     tone = np.random.randn(no_samples) #Gausian noise
+    tone = (tone/abs(tone).max())*127 #normalize and scale to fill signed 8bit integer output
 elif tone_generation_mode == "impulse":
     print "impulse at sample %d" % impulse_shift
-    tone[impulse_shift] = 1
+    tone[impulse_shift] = 127
 else:
     print "invalid tone generation option"
     exit(1)
     
-tone.astype(np.float32).tofile(out_file)
+tone.astype(np.int8).tofile(out_file)

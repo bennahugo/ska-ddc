@@ -20,7 +20,7 @@ N = int(sys.argv[6])
 P = int(sys.argv[7])
 assert(no_samples % N == 0) # make sure that we can process the data in complete blocks of size N
 
-tone = np.fromfile(in_file,dtype=np.float32)
+tone = np.fromfile(in_file,dtype=np.int8).astype(np.float32)
 w = np.fromfile(filter_file,dtype=np.float32).reshape(P,N)
 
 '''      
@@ -56,5 +56,5 @@ for lB in range(0,no_samples,N):
 '''
 dump the output
 '''
-pfb_output.astype(np.complex64).tofile(out_filtered_file)
-unfiltered_output.astype(np.complex64).tofile(out_unfiltered_file)
+pfb_output.astype(np.complex64).view(dtype=np.float32).astype(np.int8).tofile(out_filtered_file)
+unfiltered_output.astype(np.complex64).view(dtype=np.float32).astype(np.int8).tofile(out_unfiltered_file)
