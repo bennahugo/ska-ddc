@@ -126,7 +126,8 @@ void initDevice(const float * taps){
 	printf("INIT: Adding branch avoidance padding of %d elements to the IFFT output and iPfb output\n",KERNEL_BRANCH_AVOIDANCE_PADDING);
 	printf("INIT: Setting up IFFT output buffer of length %d (excluding branch avoidance padding)\n", BUFFER_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH + KERNEL_BRANCH_AVOIDANCE_PADDING)));
-	
+	printf("INIT: Ensuring initial filter padding of %d elements is set to 0\n",PAD);
+	cudaSafeCall(cudaMemset(d_ifft_output,0,sizeof(cufftReal)*PAD));
 	//Setup CU IFFT plan to process all the N-sample iffts contained in a single loop, in one go
 	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",MAX_NO_BLOCKS);
         cufftSafeCall(cufftPlan1d(&ifft_plan, N,  CUFFT_C2R, MAX_NO_BLOCKS));
