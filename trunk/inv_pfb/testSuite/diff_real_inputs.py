@@ -25,5 +25,5 @@ mse = ((inp1 - inp2) ** 2).mean()
 
 print "'%s' has mean = %f and standard deviation = %f" % (sys.argv[1],inp1_mean,inp1_stdev)
 print "'%s' has mean = %f and standard deviation = %f" % (sys.argv[2],inp2_mean,inp2_stdev)
-print "The Mean squared error between the files is %f" % (mse)
+print "\033[1;33mThe Mean squared error between the files is %f\033[0m" % (mse)
 
