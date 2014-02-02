@@ -1,8 +1,8 @@
 #!/bin/bash
 #tweak these variables if you must:
-N=512
+N=1024
 P=8
-num_samples_to_use=$((N * P * 105))
+num_samples_to_use=$((N * P * 18750))
 output_directory=../data_out
 tone_type=noise
 

@@ -13,7 +13,8 @@
 /****************************************************************************************************************
  constants
 *****************************************************************************************************************/
-const uint16_t N = 512; //Number of FFT samples (safe to tweak)
+//Number of FFT samples (safe to tweak, BUT: this number should be divisable by COALESCED_MEMORY_ALIGNMENT_BOUNDARY, otherwise there will be serious performance penalties!):
+const uint16_t N = 1024;
 const uint16_t P = 8; //Number of Filterbanks (safe to tweak)
 /*size of each input FFT (non-redundant samples). Technically this should be N/2 + 1 by the Hermite-symmetry of
 Real FFTs. However the KAT-7 B-engine discards the last element. We should pad each block of FFT data by 1 before
@@ -31,7 +32,7 @@ const uint32_t PAD = N*P;
 /*Size of chunk to send off to the GPU. Safe to tweak, **BUT**: this number must be divisable by FFT_SIZE (we should 
 send an integral number of FFTs to the GPU):
 */
-const uint32_t LOOP_LENGTH = 101 * FFT_SIZE;
+const uint32_t LOOP_LENGTH = 125000 * FFT_SIZE;
 const uint32_t BUFFER_LENGTH = LOOP_LENGTH / FFT_SIZE * N + PAD; //Number of elements in the persistant ifft output buffer
 const uint32_t MAX_NO_BLOCKS = LOOP_LENGTH / FFT_SIZE;
 //to accomodate the discarded sample for every block we must pad the number of blocks:
