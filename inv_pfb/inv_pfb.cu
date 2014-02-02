@@ -7,10 +7,19 @@
  |_____|_| \_|   \/   |______|_|  \_\_____/|______| |_|    |_|    |____/ 
                                                                          
 This is a CUDA implementation of the inverse Polyphase Filter Bank (PFB), also known as the Weighted 
-Overlap Add Method. It constructs a basic synthesis filterbank that can process output in strides and 
-is therefore suitable for real time operation where the input length is not known in advance. Note 
+Overlap Add Method (WOA). It constructs a basic synthesis filterbank that can process output in strides 
+and is therefore suitable for real time operation, where the input length is not known in advance. Note 
 that this filterbank construction does not provide Perfect Reconstruction (PR) of the original input 
 to the PFB. 
+
+Background theory:
+        For the forward process see:
+                https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique
+        The inverse process has its subfilters flipped, but follows the same trend, see:
+                A REVIEW OF POLYPHASE FILTER BANKS AND THEIR APPLICATION --- Daniel Zhou. 
+                Air Force Research Laboratory. AFRL-IF-RS-TR-2006-277 In-House Final 
+                Technical Report, September 2006.
+
 
 Copyright (C) 2014, Square Kilometer Array (SKA) South Africa
 @author Benjamin Hugo (bennahugo __AT__ aol __DOT__ com)
@@ -37,13 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 cufftReal * d_ifft_output;
 float * d_taps;
 cufftHandle ifft_plan;
+cufftComplex * d_casting_input;
 cufftComplex * d_ifft_input;
 int8_t * d_filtered_output;
 
 /****************************************************************************************************************
 Forward declare kernels
 ****************************************************************************************************************/
-__global__ void array_cast_int8_to_cufftReal(int8_t * in, cufftReal * out, uint32_t total_no_samples_casted_by_this_kernel, uint32_t no_blocks_in_dim);
+__global__ void array_cast_complex_int8_to_cufftComplex(complex_int8 * in, cufftComplex * out, 
+							uint32_t total_no_samples_casted_by_this_kernel, uint32_t no_blocks_in_dim,
+							uint32_t size_of_padded_fft_block);
 __global__ void ipfb(const cufftReal * input,  int8_t * output, const float * prototype_filter, uint32_t no_samples_to_filter, uint32_t no_blocks_in_dim);
 __global__ void move_last_P_iffts_to_front(cufftReal * ifft_array, uint32_t start_of_last_P_N_block);
 /**
@@ -109,14 +121,43 @@ void initDevice(const float * taps){
 	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH)));
 	printf("INIT: Ensuring initial filter padding of %d elements is set to 0\n",PAD);
 	cudaSafeCall(cudaMemset(d_ifft_output,0,sizeof(cufftReal)*PAD));
+	
 	//Setup CU IFFT plan to process all the N-sample iffts contained in a single loop, in one go
 	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",MAX_NO_BLOCKS);
-        cufftSafeCall(cufftPlan1d(&ifft_plan, N,  CUFFT_C2R, MAX_NO_BLOCKS));
+	int rank_sizes[1] = {N};
+	int inembed[1] = {SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS};
+	int onembed[1] = {BUFFER_LENGTH};
+	/*This just checks that COALESCED_MEMORY_ALIGNMENT_BOUNDARY (in bytes) is divisable by 8 bytes. This is a reasonable 
+	  assumption since this should be 128 byte under compute capability 2.0. Although this number may differ in future architectures it 
+	  should always jump in powers of two. Some resources indicate that compute capability < 2.0 used 64 byte boundaries.
+
+	  We need this to find out how many complex numbers there are between the beginning of each consecutive (padded) strides of elements 
+	  we want to IFFT. If this is not a complex number you will have to change the cufft kernel invocation to use batches of size 1 and loop through
+	  (in steps of N) when calling the kernel (taking the calculated padding into account). Something like this should do the trick:
+	  
+	  for (uint32_t block = 0; block < no_blocks_in_stride; ++block)
+                        cufftSafeCall(cufftExecC2R(ifft_plan,
+                                      (cufftComplex*)((int8_t*)d_ifft_input + block * (SIZE_OF_PADDED_FFT_BLOCK)),
+                                      d_ifft_output + PAD + block*N));  
+	  
+	  You should then still be able to use streams to do multiple kernel invocations asynchronously.
+	*/
+	assert(SIZE_OF_PADDED_FFT_BLOCK % sizeof(cufftComplex) == 0);
+	cufftSafeCall(cufftPlanMany(&ifft_plan,1,rank_sizes,
+				    inembed,1,SIZE_OF_PADDED_FFT_BLOCK / sizeof(cufftComplex),
+				    onembed,1,N,CUFFT_C2R,MAX_NO_BLOCKS));
 	
-	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) samples long (consisting of complex numbers)
-	printf("INIT: Setting up IFFT input vector for %d blocks of FFTs, each with %d non-redundant samples\n",MAX_NO_BLOCKS,FFT_SIZE);
-        cudaSafeCall(cudaMalloc((void**)&d_ifft_input,sizeof(cufftComplex) * (FFT_SIZE * MAX_NO_BLOCKS)));
+	//alloc space for the casting input vector on the device. It should be of size LOOP_LENGTH * sizeof(complex_uint8)
+	//cudaSafeCall(cudaMalloc((void**)&d_ifft_input, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
+	
+	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) (excluding any memory alignment padding) complex samples long
+	printf("INIT: Setting up IFFT input buffer of  %d FFT blocks, each with %d non-redundant (including 1 discarded) samples. Padding to closest %d byte memory boundary (pad by %d bytes)\n",
+	       MAX_NO_BLOCKS,NO_NON_REDUNDANT_SAMPLES_PER_FFT,COALESCED_MEMORY_ALIGNMENT_BOUNDARY,SIZE_OF_PAD_FOR_FFT_BLOCK);
+        cudaSafeCall(cudaMalloc((void**)&d_ifft_input, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
         
+	printf("INIT: Ensuring ifft input array is set to 0\n");
+	cudaSafeCall(cudaMemset(d_ifft_input,0,SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
+
 	//reserve memory for output (this should be BATCH * N real samples long)
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
         cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(uint8_t) * (MAX_NO_BLOCKS*N)));
@@ -141,14 +182,6 @@ void releaseDevice(){
 This method computes the inverse polyphase filter bank (pfb) operation (Weighted Window Overlap Add method) on a subset ("stride") 
 of the output of a previous forward pfb operation.
 
-Background theory:
-        For the forward process see:
-                https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique
-        The inverse process has its subfilters flipped, but follows the same trend, see:
-                A REVIEW OF POLYPHASE FILTER BANKS AND THEIR APPLICATION --- Daniel Zhou. 
-                Air Force Research Laboratory. AFRL-IF-RS-TR-2006-277 In-House Final 
-                Technical Report, September 2006.
-
 The outline of the process is as follows:
  1. Perform N-element IFFTs on all the blocks in this stride. The output has an initial padding of P * N blocks.
  2. Filter the IFFTed samples (N * no_blocks_in_stride) with the inverse filter. This filtering operation starts
@@ -158,7 +191,7 @@ The outline of the process is as follows:
  for processing the next stride of pfb output.
 
 NOTE: the last point implies that this method has state associated with it. It is critical to maintain a persistant IFFT 
-buffer on the cuda device to ensure that we do not loose P*N samples between processing consecutive strides of pfb output.
+output buffer on the CUDA device to ensure that we do not loose P*N samples between processing consecutive strides of pfb output.
 
 We could have equivalently achieved step 3 using a ringbuffer. However this would have meant that we could not process
 all the IFFTs in one batch (it would have been split up into two batches). Copying P*N samples from one memory location
@@ -184,6 +217,10 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	{        
 		cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_int8) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
 	}
+	cufftComplex * d_temp_cast_out;
+	cudaSafeCall(cudaMalloc((void**)&d_temp_cast_out, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
+	cudaSafeCall(cudaMemset(d_temp_cast_out,0,SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
+
 	printf("Casting FFT data from int8 samples to 32-bit floating point samples\n");
 	{
 		/*Split the threads over a 2-D grid. This is to get past indexing restrictions (especially on older GPUs).  We're 
@@ -194,11 +231,13 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 		  to the complex float32 memory (in essence achieving two different views on the same memory)
                 */
 		dim3 threads_per_block(CASTING_THREADS_PER_BLOCK,1,1);
-		uint32_t no_samples_to_cast = no_blocks_in_stride * FFT_SIZE * 2; //casting to a 64-bit complex number so there should be 2 32-bit casts
+		uint32_t no_samples_to_cast = no_blocks_in_stride * FFT_SIZE; 
 		uint32_t no_blocks = (uint32_t)ceil(no_samples_to_cast / (float) CASTING_THREADS_PER_BLOCK);
 		uint32_t no_blocks_in_dim = (uint32_t)ceil(sqrt(no_blocks));
                 dim3 no_blocks_per_grid(no_blocks_in_dim,no_blocks_in_dim,1);
-                array_cast_int8_to_cufftReal<<<no_blocks_per_grid,threads_per_block,0>>>((int8_t*)d_ifft_input,(cufftReal*)d_ifft_input,no_samples_to_cast,no_blocks_in_dim);
+                array_cast_complex_int8_to_cufftComplex<<<no_blocks_per_grid,threads_per_block,0>>>((complex_int8*)d_ifft_input,d_temp_cast_out,
+													no_samples_to_cast,no_blocks_in_dim,
+													SIZE_OF_PADDED_FFT_BLOCK);
 
                 cudaThreadSynchronize();
                 cudaError code = cudaGetLastError();
@@ -210,9 +249,11 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
 	{
-		cufftSafeCall(cufftExecC2R(ifft_plan,d_ifft_input,d_ifft_output + PAD));	
+		//TODO optimize: include streams here so cufft can do async kernel calls
+		cufftSafeCall(cufftExecC2R(ifft_plan, d_temp_cast_out,d_ifft_output + PAD)); 
 	}
 	cudaThreadSynchronize();
+	cudaSafeCall(cudaFree(d_temp_cast_out));
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);
 	//now do the inverse filtering
 	{
@@ -239,7 +280,7 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 		dim3 no_blocks(P,1,1);
 		move_last_P_iffts_to_front<<<no_blocks,threads_per_block,0>>>(d_ifft_output, N * no_blocks_in_stride);
 	
-		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly
+		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly using streams
 	        cudaError code = cudaGetLastError();
         	if (code != cudaSuccess){
                 	fprintf (stderr,"Error while executing moving last N*P IFFTs -- %s\n", cudaGetErrorString(code));
@@ -251,14 +292,19 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	cudaSafeCall(cudaMemcpy(output_buffer, d_filtered_output,sizeof(int8_t)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost));
 }
 /**
-This kernel takes in a precopied 8-bit signed integer array and casts the array elements to 32-bit floats. If the in and out pointers
-are pointing to the same device memory location the operation will be done in place, as long as the enough memory has been allocated to fit
-total_no_samples_casted_by_this_kernel * sizeof(cufftReal).
+This kernel takes in a precopied complex 8-bit signed integer array and casts the array elements to complex 32-bit floating points. If the in and 
+out pointers are pointing to the same device memory location the operation will be done in place, as long as the enough memory has been allocated to fit
+size_of_padded_fft_block * no_blocks_of_size_CASTING_THREADS_PER_BLOCK.
 
 This kernel should be invoked with num_blocks = [CASTING_THREADS_PER_BLOCK,1,1] and 
 num_blocks_per_grid = [ceil(sqrt(no_blocks_of_size_CASTING_THREADS_PER_BLOCK)),ceil(sqrt(no_blocks_of_size_CASTING_THREADS_PER_BLOCK)),1]
+
+If N is a multiple of the warpsize (usually 32 threads) we should achieve coalesced memory accesses due to the fact that we're copying
+the output into strides each of length N (ready to perform an inplace IFFT on).
 */
-__global__ void array_cast_int8_to_cufftReal(int8_t * in, cufftReal * out, uint32_t total_no_samples_casted_by_this_kernel, uint32_t no_blocks_in_dim){
+__global__ void array_cast_complex_int8_to_cufftComplex(complex_int8 * in, cufftComplex * out, 
+							uint32_t total_no_samples_casted_by_this_kernel, uint32_t no_blocks_in_dim,
+                                                        uint32_t size_of_padded_fft_block){
 	/*This 2-D grid indexing scheme is used to ensure we can process more than 65535 blocks in total on older architectures
           as discussed earlier.
         */
@@ -266,7 +312,15 @@ __global__ void array_cast_int8_to_cufftReal(int8_t * in, cufftReal * out, uint3
 	if (tI < total_no_samples_casted_by_this_kernel){
 		//cast in reverse to ensure no samples in the original set is overwritten in order to make this inplace-casting-compatible:
 		register uint32_t reversed_index = total_no_samples_casted_by_this_kernel - tI - 1;
-		out[reversed_index] = (cufftReal) in[reversed_index];
+		register uint32_t no_preceeding_fft_blocks = reversed_index / FFT_SIZE;
+		register uint32_t sample_no_in_fft_block = reversed_index % FFT_SIZE;
+		register complex_int8 inElem = in[reversed_index]; //input should be coalesced
+		register cufftComplex outElem = {(cufftReal) inElem.r,(cufftReal) inElem.i};
+		//output should be coalesced if we align the output to the memory byte boundary for coalesced accesses:
+		register cufftComplex * mem_aligned_out = (cufftComplex*)((int8_t*)out + 
+							  no_preceeding_fft_blocks * size_of_padded_fft_block) + 
+			 				  sample_no_in_fft_block; 
+		mem_aligned_out[0] = outElem;
 	}
 }
 
@@ -291,6 +345,9 @@ Technically the prototype filter remains the same for the synthesis filter bank.
 the commutator technically runs in reverse as well, meaning that we should flip the order subfilters are executed in the bank. But whether we accumulate
 each y[n] in forward or reverse does not matter. It should be clear that if the 3rd loop is run backwards with the the initialization of the 
 accumulation set to a position in the last subfilter the result should remain the same.
+
+All global memory calls made (P tap reads + P input reads + 1 output write per thread) should be coalesced provided N is a multiple of the warpsize
+(usually this is 32 threads).
 */
 __global__ void ipfb(const cufftReal * input,  int8_t * output, const float * prototype_filter, uint32_t no_samples_to_filter, uint32_t no_blocks_in_dim){
 	/*This grid indexing scheme is used to ensure we can process more than 65535 blocks in total on older architectures
@@ -304,7 +361,7 @@ __global__ void ipfb(const cufftReal * input,  int8_t * output, const float * pr
 		#pragma unroll
 		for (uint32_t p = 1; p < P; ++p)
 			accum += input[lB + n + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
-		output[lB + n] = (int8_t)accum;
+		output[lB + n] = (int8_t)accum; //Output should be coalesced
 	}
 }
 

@@ -14,6 +14,7 @@ uint32_t writeDataToDisk(const char * filename, uint32_t element_size, uint32_t 
  @args element_size size of the individual elements in bytes
  @args length number of elents to read
  @args buffer pre-allocated buffer of length 'element_size*length' in bytes
+ @args seek number of bytes to seek through the file before reading. Default 0.
  @returns 0 if file could not be opened or seek failed, else number of elements of size "element_size" read
 */
 uint32_t readDataFromDisk(const char * filename, uint32_t element_size, uint32_t length, void * buffer, uint32_t seek){
@@ -30,15 +31,16 @@ uint32_t readDataFromDisk(const char * filename, uint32_t element_size, uint32_t
         return elemsRead;
 }
 
-/**Writes data to disk
+/**Writes data to disk (to blank file or appending)
  @args filename
  @args element_size size of the individual elements in bytes
  @args length number of elents to write
  @args buffer pre-allocated buffer of length 'element_size*length' in bytes
+ @args blank_file if true a file will be created or an existing file overwritten, otherwise append mode requires the file to exist prior to opening.
  @returns 0 if file could not be opened, else number of elements of size "element_size" successfully written to disk
 */
-uint32_t writeDataToDisk(const char * filename, uint32_t element_size, uint32_t length, const void * buffer, bool blankfile){
-	FILE * hnd = fopen(filename, blankfile ? "w" : "a");
+uint32_t writeDataToDisk(const char * filename, uint32_t element_size, uint32_t length, const void * buffer, bool blank_file){
+	FILE * hnd = fopen(filename, blank_file ? "w" : "a");
 	uint32_t elemsWrote = 0;
         if (hnd != NULL){
                 elemsWrote = fwrite(buffer,element_size,length,hnd);
@@ -99,10 +101,11 @@ int main ( int argc, char ** argv ){
         	writeDataToDisk(output_filename,sizeof(int8_t),num_blocks_to_process*N,output,i == 0);
 	}
 	printf("---------------------------------------------------------\n");
-        //release the device
+        
+	//safely release the device, freeing up all allocated memory
         releaseDevice();
 
-        //free any hostside memory:
+        //free any hostside memory
         free(output);
         free(pfb_data);
         free(taps);

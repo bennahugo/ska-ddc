@@ -14,7 +14,17 @@
 *****************************************************************************************************************/
 const uint16_t N = 512; //Number of FFT samples (safe to tweak)
 const uint16_t P = 8; //Number of Filterbanks (safe to tweak)
-const uint32_t FFT_SIZE = N/2 + 1; //size of each input FFT (non-redundant samples)
+/*size of each input FFT (non-redundant samples). Technically this should be N/2 + 1 by the Hermite-symmetry of
+Real FFTs. However the KAT-7 B-engine discards the last element. We should pad each block of FFT data by 1 before
+invoking any IFFT
+*/
+const uint32_t FFT_SIZE = N/2;
+const uint32_t NO_NON_REDUNDANT_SAMPLES_PER_FFT = N/2 + 1;
+const uint32_t COALESCED_MEMORY_ALIGNMENT_BOUNDARY = 128; //128 bytes is normally the memory alignment boundary that will result in coalesced reads
+const uint32_t SIZE_OF_NON_REDUNDANT_SAMPLES_OF_FFT = NO_NON_REDUNDANT_SAMPLES_PER_FFT * sizeof(cufftComplex); //in bytes
+const uint32_t SIZE_OF_PAD_FOR_FFT_BLOCK = (uint32_t)ceil(SIZE_OF_NON_REDUNDANT_SAMPLES_OF_FFT / (float) COALESCED_MEMORY_ALIGNMENT_BOUNDARY) * 
+	  				    COALESCED_MEMORY_ALIGNMENT_BOUNDARY - SIZE_OF_NON_REDUNDANT_SAMPLES_OF_FFT; //size of coalesced fft padding in bytes
+const uint32_t SIZE_OF_PADDED_FFT_BLOCK = SIZE_OF_NON_REDUNDANT_SAMPLES_OF_FFT + SIZE_OF_PAD_FOR_FFT_BLOCK;
 const uint32_t WINDOW_LENGTH = N*P;
 const uint32_t PAD = N*P;
 /*Size of chunk to send off to the GPU. Safe to tweak, **BUT**: this number must be divisable by FFT_SIZE (we should 
@@ -23,7 +33,8 @@ send an integral number of FFTs to the GPU):
 const uint32_t LOOP_LENGTH = 101 * FFT_SIZE;
 const uint32_t BUFFER_LENGTH = LOOP_LENGTH / FFT_SIZE * N + PAD; //Number of elements in the persistant ifft output buffer
 const uint32_t MAX_NO_BLOCKS = LOOP_LENGTH / FFT_SIZE;
-
+//to accomodate the discarded sample for every block we must pad the number of blocks:
+const uint32_t PADDING_NEEDED_FOR_IFFT_INPUT = MAX_NO_BLOCKS;
 /*Block size of the int8 to cufftReal casting kernel. 256 threads per block seem to be a magic number in CUDA that works 
 well accross different generations of cards:
 */

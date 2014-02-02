@@ -2,12 +2,13 @@
 #tweak these variables if you must:
 N=512
 P=8
-num_samples_to_use=$((N * P * 105))
+num_samples_to_use=$((N * P * 10))
 output_directory=../data_out
 tone_type=noise
 
 #don't tweak these formulas unless essential:
-non_redundant_samples=$((N / 2 + 1)) #N/2 + 1 non-redundant samples in the fft output of the pfb, by the Hermite-symmetric property of real FFTs
+#N/2 + 1 non-redundant samples in the fft output of the pfb, by the Hermite-symmetric property of real FFTs, BUT: discard last one due to the SKA infrastructure:
+non_redundant_samples=$((N / 2))
 non_redundant_pfb_output=$(( (num_samples_to_use / N) * non_redundant_samples ))
 
 if [ -d "$output_directory" ]; then
