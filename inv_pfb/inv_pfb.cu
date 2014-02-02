@@ -147,16 +147,10 @@ void initDevice(const float * taps){
 				    inembed,1,SIZE_OF_PADDED_FFT_BLOCK / sizeof(cufftComplex),
 				    onembed,1,N,CUFFT_C2R,MAX_NO_BLOCKS));
 	
-	//alloc space for the casting input vector on the device. It should be of size LOOP_LENGTH * sizeof(complex_uint8)
-	//cudaSafeCall(cudaMalloc((void**)&d_ifft_input, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
-	
 	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) (excluding any memory alignment padding) complex samples long
 	printf("INIT: Setting up IFFT input buffer of  %d FFT blocks, each with %d non-redundant (including 1 discarded) samples. Padding to closest %d byte memory boundary (pad by %d bytes)\n",
 	       MAX_NO_BLOCKS,NO_NON_REDUNDANT_SAMPLES_PER_FFT,COALESCED_MEMORY_ALIGNMENT_BOUNDARY,SIZE_OF_PAD_FOR_FFT_BLOCK);
         cudaSafeCall(cudaMalloc((void**)&d_ifft_input, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
-        
-	printf("INIT: Ensuring ifft input array is set to 0\n");
-	cudaSafeCall(cudaMemset(d_ifft_input,0,SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
 
 	//reserve memory for output (this should be BATCH * N real samples long)
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
@@ -217,10 +211,6 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	{        
 		cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_int8) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
 	}
-	cufftComplex * d_temp_cast_out;
-	cudaSafeCall(cudaMalloc((void**)&d_temp_cast_out, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
-	cudaSafeCall(cudaMemset(d_temp_cast_out,0,SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
-
 	printf("Casting FFT data from int8 samples to 32-bit floating point samples\n");
 	{
 		/*Split the threads over a 2-D grid. This is to get past indexing restrictions (especially on older GPUs).  We're 
@@ -235,7 +225,7 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 		uint32_t no_blocks = (uint32_t)ceil(no_samples_to_cast / (float) CASTING_THREADS_PER_BLOCK);
 		uint32_t no_blocks_in_dim = (uint32_t)ceil(sqrt(no_blocks));
                 dim3 no_blocks_per_grid(no_blocks_in_dim,no_blocks_in_dim,1);
-                array_cast_complex_int8_to_cufftComplex<<<no_blocks_per_grid,threads_per_block,0>>>((complex_int8*)d_ifft_input,d_temp_cast_out,
+                array_cast_complex_int8_to_cufftComplex<<<no_blocks_per_grid,threads_per_block,0>>>((complex_int8*)d_ifft_input,d_ifft_input,
 													no_samples_to_cast,no_blocks_in_dim,
 													SIZE_OF_PADDED_FFT_BLOCK);
 
@@ -250,10 +240,9 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	//ifft the data:
 	{
 		//TODO optimize: include streams here so cufft can do async kernel calls
-		cufftSafeCall(cufftExecC2R(ifft_plan, d_temp_cast_out,d_ifft_output + PAD)); 
+		cufftSafeCall(cufftExecC2R(ifft_plan, d_ifft_input,d_ifft_output + PAD)); 
 	}
 	cudaThreadSynchronize();
-	cudaSafeCall(cudaFree(d_temp_cast_out));
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);
 	//now do the inverse filtering
 	{
@@ -321,6 +310,14 @@ __global__ void array_cast_complex_int8_to_cufftComplex(complex_int8 * in, cufft
 							  no_preceeding_fft_blocks * size_of_padded_fft_block) + 
 			 				  sample_no_in_fft_block; 
 		mem_aligned_out[0] = outElem;
+		if (sample_no_in_fft_block == (FFT_SIZE - 1)){
+			cufftComplex zero = {0,0};
+			/*this last access is definitely not coalesced, but it is only extra access per block (this should not have a great detremental impact on performance. 
+			  Putting this in a separate kernel will probably not help either... the individual threads will jump in very long strides and therefore be anything
+			  but coalesced.
+			*/
+			mem_aligned_out[1] = zero; //the sample next to the N/2th sample in each block must be set to 0 (the f-engine discarded the last frequency bin)
+		}
 	}
 }
 
