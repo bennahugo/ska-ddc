@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include "inv_pfb.h"
 
 uint32_t readDataFromDisk(const char * filename, uint32_t element_size, uint32_t length, void * buffer, uint32_t seek = 0);
@@ -76,18 +78,21 @@ int main ( int argc, char ** argv ){
                 fprintf(stderr, "Prototype filter has to be %d long\n",WINDOW_LENGTH);
                 return 1;
         }
-
-        //Read in input file (output of earlier pfb process, so these will be complex numbers
-        complex_int8 * pfb_data = (complex_int8*) malloc(sizeof(complex_int8)*(num_samples));
-        if (readDataFromDisk(pfb_output_filename,sizeof(complex_int8),num_samples,pfb_data,0) != num_samples){
-                fprintf(stderr, "input pfb data does not contain %d non-redundant samples\n", num_samples);
-                return 1;
-	}
 	
         //Setup the device and copy the taps
         initDevice(taps);
+	
+	//Read in input file (output of earlier pfb process, so these will be complex numbers
+        complex_int8 * pfb_data;
+        cudaSafeCall(cudaMallocHost((void **)&pfb_data,sizeof(complex_int8)*num_samples)); //critical optimization: pin host input memory to disable paging and speed up transfers to device
+        if (readDataFromDisk(pfb_output_filename,sizeof(complex_int8),num_samples,pfb_data,0) != num_samples){
+                fprintf(stderr, "input pfb data does not contain %d non-redundant samples\n", num_samples);
+                return 1;
+        }
+
 	uint32_t ipfb_output_size = (num_samples / FFT_SIZE) * N; //The iPFB process produces blocks of size N
-        int8_t * output = (int8_t*) malloc(sizeof(int8_t)*ipfb_output_size);
+        int8_t * output;
+	cudaSafeCall(cudaMallocHost((void **)&output,sizeof(int8_t)*ipfb_output_size)); //critical optimization: pin host output memory to disable paging and speed up transfers from device
 
         //do some processing
 	printf("\033[0;31mProcessing starting\033[0m\n---------------------------------------------------------\n%d non-redundant samples in the input data\n",num_samples);
@@ -101,13 +106,14 @@ int main ( int argc, char ** argv ){
         	writeDataToDisk(output_filename,sizeof(int8_t),num_blocks_to_process*N,output,i == 0);
 	}
 	printf("---------------------------------------------------------\n");
-        
+
+        //free any hostside memory
+	free(taps);
+        cudaSafeCall(cudaFreeHost(output));
+        cudaSafeCall(cudaFreeHost(pfb_data));
+
 	//safely release the device, freeing up all allocated memory
         releaseDevice();
 
-        //free any hostside memory
-        free(output);
-        free(pfb_data);
-        free(taps);
         printf("\033[1;33mApplication Terminated Normally\033[0m\n---------------------------------------------------------\n");
 }
