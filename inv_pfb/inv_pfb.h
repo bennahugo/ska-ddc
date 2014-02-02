@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
 #include <cufft.h>
 #include <assert.h>
 #include "math.h"
