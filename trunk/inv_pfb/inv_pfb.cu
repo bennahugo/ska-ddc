@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 cufftReal * d_ifft_output;
 float * d_taps;
 cufftHandle ifft_plan;
-cufftComplex * d_casting_input;
 cufftComplex * d_ifft_input;
 int8_t * d_filtered_output;
 
@@ -205,7 +204,7 @@ device once off before processing starts and tairing down the memory allocations
 @precondition call initDevice BEFORE calling this method
 */
 void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint32_t no_blocks_in_stride){
-	assert(no_blocks_in_stride <= LOOP_LENGTH/(N/2+1)); //this is the maximum number of blocks we can sent to the GPU
+	assert(no_blocks_in_stride <= LOOP_LENGTH/(FFT_SIZE)); //this is the maximum number of blocks we can sent to the GPU
 	//copy everything in this stride into the device ifft input vector
 	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride,FFT_SIZE);
 	{        
