@@ -48,7 +48,7 @@ float * d_taps;
 cufftHandle ifft_plan;
 cufftComplex * d_ifft_input;
 int8_t * d_filtered_output;
-
+cudaStream_t ifft_stream,ifft_mov_output_cpy_stream;
 /****************************************************************************************************************
 Forward declare kernels
 ****************************************************************************************************************/
@@ -145,7 +145,8 @@ void initDevice(const float * taps){
 	cufftSafeCall(cufftPlanMany(&ifft_plan,1,rank_sizes,
 				    inembed,1,SIZE_OF_PADDED_FFT_BLOCK / sizeof(cufftComplex),
 				    onembed,1,N,CUFFT_C2R,MAX_NO_BLOCKS));
-	
+	cudaSafeCall(cudaStreamCreate(&ifft_stream));
+	cufftSafeCall(cufftSetStream(ifft_plan,ifft_stream));
 	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) (excluding any memory alignment padding) complex samples long
 	printf("INIT: Setting up IFFT input buffer of  %d FFT blocks, each with %d non-redundant (including 1 discarded) samples. Padding to closest %d byte memory boundary (pad by %d bytes)\n",
 	       MAX_NO_BLOCKS,NO_NON_REDUNDANT_SAMPLES_PER_FFT,COALESCED_MEMORY_ALIGNMENT_BOUNDARY,SIZE_OF_PAD_FOR_FFT_BLOCK);
@@ -155,6 +156,7 @@ void initDevice(const float * taps){
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
         cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(uint8_t) * (MAX_NO_BLOCKS*N)));
 	printf("---------------------------------------------------------\n");
+	cudaSafeCall(cudaStreamCreate(&ifft_mov_output_cpy_stream));
 }
 /**
  Deallocates any memory associated with the inverse pfb process from the device.
@@ -167,6 +169,8 @@ void releaseDevice(){
 	cudaSafeCall(cudaFree(d_ifft_input));
         cudaSafeCall(cudaFree(d_filtered_output));
 	cufftSafeCall(cufftDestroy(ifft_plan));
+	cudaSafeCall(cudaStreamDestroy(ifft_stream));
+	cudaSafeCall(cudaStreamDestroy(ifft_mov_output_cpy_stream));
 	cudaDeviceReset(); //leave the device in a safe state
 	printf("DEINIT: Device safely released\n---------------------------------------------------------\n");
 }
@@ -238,10 +242,9 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
 	{
-		//TODO optimize: include streams here so cufft can do async kernel calls
 		cufftSafeCall(cufftExecC2R(ifft_plan, d_ifft_input,d_ifft_output + PAD)); 
+		cudaSafeCall(cudaStreamSynchronize(ifft_stream));//wait for all the iffts to finish before moving on...
 	}
-	cudaThreadSynchronize();
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);
 	//now do the inverse filtering
 	{
@@ -261,23 +264,23 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 			exit(-1);
 		}
 	}
+	//copy N-sized chunks to the output array:
+        printf("Finished inverse pfb on stride, copying %d blocks, each of %d elements from the device\n",no_blocks_in_stride,N);
+        cudaSafeCall(cudaMemcpyAsync(output_buffer, d_filtered_output,sizeof(int8_t)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost,ifft_mov_output_cpy_stream)); //we can start copying the output while we're moving the iffts
 	printf("Moving %d IFFT samples from position %d of the IFFT persistant buffer to index 0 of the buffer.\n",N * P,N * no_blocks_in_stride);
 	//move the last PAD samples in the ifft output array to the front of the ifft output array for processing the next stride of elements:
 	{
 		dim3 threads_per_block(N,1,1);
 		dim3 no_blocks(P,1,1);
-		move_last_P_iffts_to_front<<<no_blocks,threads_per_block,0>>>(d_ifft_output, N * no_blocks_in_stride);
-	
-		cudaThreadSynchronize(); //Optimization TODO: can do the output memcpy and this kernel asyncly using streams
-	        cudaError code = cudaGetLastError();
-        	if (code != cudaSuccess){
-                	fprintf (stderr,"Error while executing moving last N*P IFFTs -- %s\n", cudaGetErrorString(code));
-                	exit(-1);
-		}
+		move_last_P_iffts_to_front<<<no_blocks,threads_per_block,0,ifft_mov_output_cpy_stream>>>(d_ifft_output, N * no_blocks_in_stride);
 	}
-	//copy N-sized chunks to the output array:
-	printf("Finished inverse pdb on stride, copying %d blocks, each of %d elements from the device\n",no_blocks_in_stride,N);
-	cudaSafeCall(cudaMemcpy(output_buffer, d_filtered_output,sizeof(int8_t)*(no_blocks_in_stride*N),cudaMemcpyDeviceToHost));
+	cudaSafeCall(cudaStreamSynchronize(ifft_mov_output_cpy_stream));
+	cudaError code = cudaGetLastError();
+                if (code != cudaSuccess){
+                        fprintf (stderr,"Error while executing moving last N*P IFFTs -- %s\n", cudaGetErrorString(code));
+                        exit(-1);
+                }
+
 }
 /**
 This kernel takes in a precopied complex 8-bit signed integer array and casts the array elements to complex 32-bit floating points. If the in and 
