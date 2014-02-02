@@ -18,7 +18,8 @@ out_file = sys.argv[4]
 no_samples = int(sys.argv[5])
 N = int(sys.argv[6])
 P = int(sys.argv[7])
-fft_non_redundant = N / 2 + 1 #N/2+1 of non-redundant samples in a real fft by the Hermite-symmetric property
+#N/2 of non-redundant samples in a real fft by the Hermite-symmetric property (the last frequency bin is discarded due to KAT-7 infrastructure, should have ideally been N/2+1):
+fft_non_redundant = N / 2
 assert(no_samples % fft_non_redundant == 0) #ensure we're only inverting an integral number of FFTs (with only non-redundant samples)
 ipfb_output_size = (no_samples/fft_non_redundant)*N
 
@@ -44,11 +45,15 @@ for computational efficiency invert every FFT from the forward process only once
 we'll need a persistant buffer / ring buffer to store the previous IFFTs -- the buffering approach is explained and implemented in the CUDA version
 '''
 for lB in range(0,no_samples,fft_non_redundant):
-    #reverse to what we've done in the forward pfb: we jump in steps of N on the LHS and steps of N/2 + 1 on the RHS
+    #reverse to what we've done in the forward pfb: we jump in steps of N on the LHS and steps of N/2 on the RHS
     output_lB = (lB/fft_non_redundant)*N + pad
     output_uB = output_lB + N
+    #the inverse real FFT expects N/2 + 1 inputs by the Hermite property... We will have to pad each input chunk by 1. 
+    padded_ifft_input = np.zeros(fft_non_redundant + 1,dtype=np.complex64)
+    padded_ifft_input[fft_non_redundant] = 0 #ensure the padded sample is set to 0
     #reverse the scaling factor (Parseval's Theorem) that we had to add in the forward python PFB to make it compatible with the CUDA real IFFT implementation
-    pfb_inverse_ifft_output[output_lB:output_uB] = np.real(np.fft.irfftn(pfb_output[lB:lB+fft_non_redundant] * N))
+    padded_ifft_input[0:fft_non_redundant] = pfb_output[lB:lB+fft_non_redundant] * N
+    pfb_inverse_ifft_output[output_lB:output_uB] = np.real(np.fft.irfftn(padded_ifft_input))
 
 '''
 Inverse filterbank
