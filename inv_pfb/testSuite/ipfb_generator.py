@@ -8,6 +8,7 @@ See IPFB GPU code for fuller explanation on the IPFB process
 from pylab import *
 import sys
 import scipy.signal
+import time
 if len(sys.argv) != 8:
     print "provide ipfb input filename (as output by pfb_generator), prototype FIR filter, output filename for IFFTed data, output filename for ipfb output, sample count, N and P"
     sys.exit(1)
@@ -39,7 +40,7 @@ w_i = np.fliplr(w)
 
 pfb_inverse_ifft_output = np.zeros(ipfb_output_size+pad).astype(np.float32)
 pfb_inverse_output = np.zeros(ipfb_output_size).astype(np.float32)
-
+tic = time.time()
 '''
 for computational efficiency invert every FFT from the forward process only once... for xx large data
 we'll need a persistant buffer / ring buffer to store the previous IFFTs -- the buffering approach is explained and implemented in the CUDA version
@@ -61,6 +62,7 @@ See discussion in ipfb GPU code
 '''
 for lB in range(0,ipfb_output_size,N): 
     pfb_inverse_output[lB:lB+N] = np.flipud(pfb_inverse_ifft_output[lB:lB+(P*N)].reshape(P,N)*w_i).sum(axis=0)
-
+toc = time.time()
+print "IPFB took %f seconds to complete computations" % (toc - tic)
 pfb_inverse_output.astype(np.float32).astype(np.int8).tofile(out_file)
 pfb_inverse_ifft_output.astype(np.float32).astype(np.int8).tofile(ifft_out_file)

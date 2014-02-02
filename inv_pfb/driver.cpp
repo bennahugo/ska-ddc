@@ -99,12 +99,26 @@ int main ( int argc, char ** argv ){
 	uint32_t num_loops = (uint32_t)ceil(num_samples / float(LOOP_LENGTH));
 	printf("Only %d samples can be processed by the GPU at a time. %d iterations needed to complete the inverse pfb\n",LOOP_LENGTH,num_loops);
 	printf("---------------------------------------------------------\n");
+	float total_time_seconds = 0;
+	cudaEvent_t tic,toc;
+	cudaSafeCall(cudaEventCreate(&tic));
+	cudaSafeCall(cudaEventCreate(&toc));
 	for (uint32_t i = 0; i < num_loops; ++i){
 		uint32_t num_blocks_to_process = ((uint32_t)fmin(num_samples - i * LOOP_LENGTH,LOOP_LENGTH)) / FFT_SIZE; 
 		printf("\033[0;32mExecuting loop %d/%d. Processing %d blocks of size %d complex numbers\033[0m\n\n",i+1,num_loops,num_blocks_to_process,FFT_SIZE);
+		cudaSafeCall(cudaEventRecord(tic));
 	        processNextStride(pfb_data + (i * LOOP_LENGTH), output, num_blocks_to_process);
+		cudaSafeCall(cudaEventRecord(toc));
+		cudaSafeCall(cudaEventSynchronize(toc));
+		float loop_exec_time = 0;
+		cudaSafeCall(cudaEventElapsedTime(&loop_exec_time, tic, toc));
+		total_time_seconds += loop_exec_time / 1000;
         	writeDataToDisk(output_filename,sizeof(int8_t),num_blocks_to_process*N,output,i == 0);
 	}
+	cudaSafeCall(cudaEventDestroy(tic));
+	cudaSafeCall(cudaEventDestroy(toc));
+	printf("---------------------------------------------------------\n");
+	printf("\033[44;33mTOTAL PROCESSING TIME: %f seconds\033[0m\n",total_time_seconds);
 	printf("---------------------------------------------------------\n");
 
         //free any hostside memory
