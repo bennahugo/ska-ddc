@@ -32,7 +32,7 @@ const uint32_t PAD = N*P;
 /*Size of chunk to send off to the GPU. Safe to tweak, **BUT**: this number must be divisable by FFT_SIZE (we should 
 send an integral number of FFTs to the GPU):
 */
-const uint32_t LOOP_LENGTH = 125000 * FFT_SIZE;
+const uint32_t LOOP_LENGTH = 320000 * FFT_SIZE;
 const uint32_t BUFFER_LENGTH = LOOP_LENGTH / FFT_SIZE * N + PAD; //Number of elements in the persistant ifft output buffer
 const uint32_t MAX_NO_BLOCKS = LOOP_LENGTH / FFT_SIZE;
 //to accomodate the discarded sample for every block we must pad the number of blocks:
