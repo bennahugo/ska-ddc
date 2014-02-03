@@ -50,7 +50,6 @@ complex_int8 * d_cast_input;
 cufftComplex * d_cast_output;
 int8_t * d_filtered_output;
 cudaStream_t ifft_stream,ifft_mov_output_cpy_stream;
-//texture <float,1,cudaReadModeElementType>  ;
 
 /****************************************************************************************************************
 Forward declare kernels
@@ -108,8 +107,9 @@ void initDevice(const float * taps){
 	/*For now we'll copy the taps into global memory. It doesn't make sense to copy this to constant memory
 	  as the individual threads in each warp will be accessing different locations, and will therefore be serialized.
 	  Instead memory calls should be coalesced for each warp of threads due to the nice accessing pattern of the
-	  Weighted Window Overlap Add method. TODO: One optimization trick that one may try is to copy this into texture memory
-	  where there may be a slight performance increase due to the texture caching properties of the GPU.
+	  Weighted Window Overlap Add method. Another optimization trick that one may try is to copy this into texture memory
+	  where there may be a slight performance increase due to the texture caching properties of the GPU. From experimentation
+	  we found that normal coalesced reads are actually faster, so this was a dead end as well.
 	*/
 	printf("\033[0;31mInitialization routines\033[0m\n---------------------------------------------------------\nINIT: Copying prototype filter of %d taps to device\n",WINDOW_LENGTH);
 	cudaSafeCall(cudaMalloc((void**)&d_taps,sizeof(float)*WINDOW_LENGTH));
