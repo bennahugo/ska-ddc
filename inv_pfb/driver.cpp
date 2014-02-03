@@ -118,7 +118,8 @@ int main ( int argc, char ** argv ){
 	cudaSafeCall(cudaEventDestroy(tic));
 	cudaSafeCall(cudaEventDestroy(toc));
 	printf("---------------------------------------------------------\n");
-	printf("\033[44;33mTOTAL PROCESSING TIME: %f seconds\033[0m\n",total_time_seconds);
+	printf("\033[44;33mTOTAL PROCESSING TIME: %f seconds (@ %f Gbps)\033[0m\n",total_time_seconds,
+		(num_samples * sizeof(complex_int8) / 1024.0 / 1024.0 / 1024.0 * 8.0) / total_time_seconds);
 	printf("---------------------------------------------------------\n");
 
         //free any hostside memory

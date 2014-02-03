@@ -1,9 +1,28 @@
 #!/bin/bash
-#tweak these variables if you must:
+#
+# This is an example script
+#
+#These commands set up the Grid Environment for your job:
+#PBS -N TEST_DATA_GEN
+#PBS -l nodes=1:ppn=1:series600,walltime=00:01:00
+#PBS -q UCTlong
+#
+
+# Change to the directory from which the job was submitted.  
+#cd $PBS_O_WORKDIR
+
+# Print the date and time
+echo "Script started at "$(date)
+
+# Host name of the node we are executing on
+echo ""
+echo "Running on: $(hostname)"
+echo "-----------------------------------------------------------------------"
+
 N=1024
 P=8
-num_samples_to_use=$((N * P * 18750))
-output_directory=../data_out
+num_samples_to_use=$((N * P * 12500))
+output_directory=../../hexScratch/data_out
 tone_type=noise
 
 #don't tweak these formulas unless essential:

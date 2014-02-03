@@ -46,9 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 cufftReal * d_ifft_output;
 float * d_taps;
 cufftHandle ifft_plan;
-cufftComplex * d_ifft_input;
+complex_int8 * d_cast_input;
+cufftComplex * d_cast_output;
 int8_t * d_filtered_output;
 cudaStream_t ifft_stream,ifft_mov_output_cpy_stream;
+//texture <float,1,cudaReadModeElementType>  ;
+
 /****************************************************************************************************************
 Forward declare kernels
 ****************************************************************************************************************/
@@ -120,7 +123,8 @@ void initDevice(const float * taps){
 	cudaSafeCall(cudaMalloc((void**)&d_ifft_output,sizeof(cufftReal) * (BUFFER_LENGTH)));
 	printf("INIT: Ensuring initial filter padding of %d elements is set to 0\n",PAD);
 	cudaSafeCall(cudaMemset(d_ifft_output,0,sizeof(cufftReal)*PAD));
-	
+	printf("INIT: Setting up cast input buffer of length %d*complex_int8\n",LOOP_LENGTH);
+	cudaSafeCall(cudaMalloc((void**)&d_cast_input,sizeof(complex_int8) * LOOP_LENGTH));
 	//Setup CU IFFT plan to process all the N-sample iffts contained in a single loop, in one go
 	printf("INIT: Setting up IFFT plan for %d blocks of FFTs\n",MAX_NO_BLOCKS);
 	int rank_sizes[1] = {N};
@@ -150,8 +154,8 @@ void initDevice(const float * taps){
 	//alloc space for the ifft input vector on the device. The input vector should be BATCH * (N/2 + 1) (excluding any memory alignment padding) complex samples long
 	printf("INIT: Setting up IFFT input buffer of  %d FFT blocks, each with %d non-redundant (including 1 discarded) samples. Padding to closest %d byte memory boundary (pad by %d bytes)\n",
 	       MAX_NO_BLOCKS,NO_NON_REDUNDANT_SAMPLES_PER_FFT,COALESCED_MEMORY_ALIGNMENT_BOUNDARY,SIZE_OF_PAD_FOR_FFT_BLOCK);
-        cudaSafeCall(cudaMalloc((void**)&d_ifft_input, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
-
+        cudaSafeCall(cudaMalloc((void**)&d_cast_output, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
+	cudaSafeCall(cudaMemset(d_cast_output,0, SIZE_OF_PADDED_FFT_BLOCK * MAX_NO_BLOCKS));
 	//reserve memory for output (this should be BATCH * N real samples long)
 	printf("INIT: Setting up PFB output vector of to store %d blocks of output, each with %d samples\n",MAX_NO_BLOCKS,N);
         cudaSafeCall(cudaMalloc((void**)&d_filtered_output,sizeof(uint8_t) * (MAX_NO_BLOCKS*N)));
@@ -166,7 +170,8 @@ void releaseDevice(){
 	printf("\033[0;31mAll done, releasing device\033[0m\n---------------------------------------------------------\n");
 	cudaSafeCall(cudaFree(d_taps));
 	cudaSafeCall(cudaFree(d_ifft_output));
-	cudaSafeCall(cudaFree(d_ifft_input));
+	cudaSafeCall(cudaFree(d_cast_input));
+	cudaSafeCall(cudaFree(d_cast_output));
         cudaSafeCall(cudaFree(d_filtered_output));
 	cufftSafeCall(cufftDestroy(ifft_plan));
 	cudaSafeCall(cudaStreamDestroy(ifft_stream));
@@ -212,23 +217,19 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	//copy everything in this stride into the device ifft input vector
 	printf("Copying %d blocks of FFT data, each of length %d to the device\n", no_blocks_in_stride,FFT_SIZE);
 	{        
-		cudaSafeCall(cudaMemcpy(d_ifft_input,input,sizeof(complex_int8) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
+		cudaSafeCall(cudaMemcpy(d_cast_input,input,sizeof(complex_int8) * FFT_SIZE * no_blocks_in_stride,cudaMemcpyHostToDevice));
 	}
 	printf("Casting FFT data from int8 samples to 32-bit floating point samples\n");
 	{
 		/*Split the threads over a 2-D grid. This is to get past indexing restrictions (especially on older GPUs).  We're 
 		  catering for a minimum of Compute Capability 2.0 here, which can only run 65535 blocks per dimension.
-
-		  Here we're casting the copied 'stride_size_in * complex int8' samples to 'stride_size * complex float32'. Note that
-		  we're doing this in-place by casting from no_samples_to_cast - 1 DOWN TO 0. To achieve this we simply pass in casted pointers
-		  to the complex float32 memory (in essence achieving two different views on the same memory)
                 */
 		dim3 threads_per_block(CASTING_THREADS_PER_BLOCK,1,1);
 		uint32_t no_samples_to_cast = no_blocks_in_stride * FFT_SIZE; 
 		uint32_t no_blocks = (uint32_t)ceil(no_samples_to_cast / (float) CASTING_THREADS_PER_BLOCK);
 		uint32_t no_blocks_in_dim = (uint32_t)ceil(sqrt(no_blocks));
                 dim3 no_blocks_per_grid(no_blocks_in_dim,no_blocks_in_dim,1);
-                array_cast_complex_int8_to_cufftComplex<<<no_blocks_per_grid,threads_per_block,0>>>((complex_int8*)d_ifft_input,d_ifft_input,
+                array_cast_complex_int8_to_cufftComplex<<<no_blocks_per_grid,threads_per_block,0>>>(d_cast_input,d_cast_output,
 													no_samples_to_cast,no_blocks_in_dim,
 													SIZE_OF_PADDED_FFT_BLOCK);
 
@@ -242,7 +243,7 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
 	printf("Executing batched IFFT on data and saving with offset %d\n",PAD);
 	//ifft the data:
 	{
-		cufftSafeCall(cufftExecC2R(ifft_plan, d_ifft_input,d_ifft_output + PAD)); 
+		cufftSafeCall(cufftExecC2R(ifft_plan, d_cast_output,d_ifft_output + PAD)); 
 		cudaSafeCall(cudaStreamSynchronize(ifft_stream));//wait for all the iffts to finish before moving on...
 	}
 	printf("Performing inverse filtering, %d threads per block for %d blocks\n",N,no_blocks_in_stride);
@@ -280,18 +281,17 @@ void processNextStride(const complex_int8 * input, int8_t * output_buffer, uint3
                         fprintf (stderr,"Error while executing moving last N*P IFFTs -- %s\n", cudaGetErrorString(code));
                         exit(-1);
                 }
-
+	
 }
 /**
-This kernel takes in a precopied complex 8-bit signed integer array and casts the array elements to complex 32-bit floating points. If the in and 
-out pointers are pointing to the same device memory location the operation will be done in place, as long as the enough memory has been allocated to fit
-size_of_padded_fft_block * no_blocks_of_size_CASTING_THREADS_PER_BLOCK.
+This kernel takes in a precopied complex 8-bit signed integer array and casts the array elements to complex 32-bit floating points,
+preserving coalesced memory accesses for both the input and output.
 
 This kernel should be invoked with num_blocks = [CASTING_THREADS_PER_BLOCK,1,1] and 
 num_blocks_per_grid = [ceil(sqrt(no_blocks_of_size_CASTING_THREADS_PER_BLOCK)),ceil(sqrt(no_blocks_of_size_CASTING_THREADS_PER_BLOCK)),1]
 
 If N is a multiple of the warpsize (usually 32 threads) we should achieve coalesced memory accesses due to the fact that we're copying
-the output into strides each of length N (ready to perform an inplace IFFT on).
+the output into strides each of length N (ready to perform an IFFT on).
 */
 __global__ void array_cast_complex_int8_to_cufftComplex(complex_int8 * in, cufftComplex * out, 
 							uint32_t total_no_samples_casted_by_this_kernel, uint32_t no_blocks_in_dim,
@@ -302,24 +302,16 @@ __global__ void array_cast_complex_int8_to_cufftComplex(complex_int8 * in, cufft
 	register uint32_t tI = (blockIdx.x + blockIdx.y*no_blocks_in_dim)*blockDim.x + threadIdx.x;
 	if (tI < total_no_samples_casted_by_this_kernel){
 		//cast in reverse to ensure no samples in the original set is overwritten in order to make this inplace-casting-compatible:
-		register uint32_t reversed_index = total_no_samples_casted_by_this_kernel - tI - 1;
-		register uint32_t no_preceeding_fft_blocks = reversed_index / FFT_SIZE;
-		register uint32_t sample_no_in_fft_block = reversed_index % FFT_SIZE;
-		register complex_int8 inElem = in[reversed_index]; //input should be coalesced
+		//register uint32_t reversed_index = total_no_samples_casted_by_this_kernel - tI - 1;
+		register uint32_t no_preceeding_fft_blocks = tI / FFT_SIZE;
+		register uint32_t sample_no_in_fft_block = tI % FFT_SIZE;
+		register complex_int8 inElem = in[tI]; //input should be coalesced
 		register cufftComplex outElem = {(cufftReal) inElem.r,(cufftReal) inElem.i};
 		//output should be coalesced if we align the output to the memory byte boundary for coalesced accesses:
 		register cufftComplex * mem_aligned_out = (cufftComplex*)((int8_t*)out + 
 							  no_preceeding_fft_blocks * size_of_padded_fft_block) + 
 			 				  sample_no_in_fft_block; 
 		mem_aligned_out[0] = outElem;
-		if (sample_no_in_fft_block == (FFT_SIZE - 1)){
-			cufftComplex zero = {0,0};
-			/*this last access is definitely not coalesced, but it is only extra access per block (this should not have a great detremental impact on performance. 
-			  Putting this in a separate kernel will probably not help either... the individual threads will jump in very long strides and therefore be anything
-			  but coalesced.
-			*/
-			mem_aligned_out[1] = zero; //the sample next to the N/2th sample in each block must be set to 0 (the f-engine discarded the last frequency bin)
-		}
 	}
 }
 
@@ -356,7 +348,7 @@ __global__ void ipfb(const cufftReal * input,  int8_t * output, const float * pr
 	register uint32_t n = threadIdx.x;
 	if (lB + n < no_samples_to_filter){
 		register uint32_t filter_index = N - n - 1;
-		register float accum = input[lB + n]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
+		register double accum = input[lB + n]*prototype_filter[filter_index]; //Fetching data from both the filter and the input should be coalesced
 		#pragma unroll
 		for (uint32_t p = 1; p < P; ++p)
 			accum += input[lB + n + p*N]*prototype_filter[p*N + filter_index]; //Fetching data from both the filter and the input should be coalesced
