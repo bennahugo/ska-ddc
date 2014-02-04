@@ -8,9 +8,10 @@ This script investigates the difference between two REAL-valued input streams an
 should be useful in validating the output of a CUDA inverse PFB process against
 its Python counterpart.
 '''
-from pylab import *
+#from pylab import *
 import sys
 import scipy.signal
+import numpy as np
 if len(sys.argv) != 3:
         print "please specify [input file 1], [input file 2]"
         sys.exit(1)

@@ -5,9 +5,10 @@ Created on Jan 30, 2014
 
 See IPFB GPU code for fuller explanation on the IPFB process
 '''
-from pylab import *
+from scipy import *
 import sys
-import scipy.signal
+import numpy as np
+
 import time
 if len(sys.argv) != 8:
     print "provide ipfb input filename (as output by pfb_generator), prototype FIR filter, output filename for IFFTed data, output filename for ipfb output, sample count, N and P"
