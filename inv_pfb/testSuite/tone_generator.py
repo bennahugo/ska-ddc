@@ -3,9 +3,11 @@ Created on 29 Jan 2014
 
 @author: benjamin
 '''
-from pylab import *
+#from pylab import *
+from scipy import *
 import sys
-import scipy.signal
+import numpy as np
+#import scipy.signal
 if len(sys.argv) != 6:
     print "provide output filename, sample count, wave type [sine / noise / impulse], N and P"
     sys.exit(1)

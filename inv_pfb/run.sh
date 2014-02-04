@@ -4,7 +4,7 @@
 #
 #These commands set up the Grid Environment for your job:
 #PBS -N SKA__PFB
-#PBS -l nodes=srvslsgpu002:ppn=1:seriesGPU,walltime=00:01:00
+#PBS -l nodes=srvslsgpu002:ppn=1:seriesGPU,walltime=00:59:00
 #PBS -q GPUQ
 #
 
@@ -18,4 +18,8 @@ echo "Script started at "$(date)
 echo ""
 echo "Running on: $(hostname)"
 echo "-----------------------------------------------------------------------"
-/home/bhugo/ska-res/ska-ddc/inv_pfb/build/inv_pfb /home/bhugo/ska-res/ska-ddc/inv_pfb/data_out/prototype_FIR.dat 12288 /home/bhugo/ska-res/ska-ddc/inv_pfb/data_out/pfb.dat /home/bhugo/ska-res/ska-ddc/inv_pfb/pfb_inv_noise_c_ver.dat 
+ipfb_exe=/home/bhugo/ska-res/ska-ddc/inv_pfb/build/inv_pfb
+filter_file=/scratch/bhugo/data_out/prototype_FIR.dat
+input_file=/scratch/bhugo/data_out/pfb.dat
+output_file=/scratch/bhugo/c_ipfb.dat
+$ipfb_exe $filter_file $input_file $output_file

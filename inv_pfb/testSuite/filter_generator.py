@@ -3,9 +3,11 @@ Created on Jan 30, 2014
 
 @author: benjamin
 '''
-from pylab import *
-import sys
+import scipy
 import scipy.signal
+import sys
+import numpy as np
+
 
 if len(sys.argv) != 4:
     print "provide output filename, N and P"

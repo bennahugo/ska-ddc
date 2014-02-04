@@ -5,9 +5,10 @@ Created on Jan 30, 2014
 
 See inverse pfb GPU code for fuller explanation on the PFB process
 '''
-from pylab import *
+from scipy import *
 import sys
-import scipy.signal
+import numpy as np
+
 if len(sys.argv) != 8:
     print "provide tone input filename, prototype FIR filter, output filename for filtered output, output filename for unfiltered output, sample count, N and P"
     sys.exit(1)
