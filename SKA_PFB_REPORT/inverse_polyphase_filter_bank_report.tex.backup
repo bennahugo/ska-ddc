@@ -1,0 +1,94 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{glossaries}
+\usepackage{fullpage}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\setlength\parindent{0pt}
+\setlength{\parskip}{10pt}
+
+\makeglossaries
+\newglossaryentry{vlbi}{%
+name={VLBI},%
+description={Very Long Baseline Interferometry}%
+}
+\newglossaryentry{fir}{%
+name={FIR},%
+description={Finite Impulse Response}%
+}
+\newglossaryentry{pfb}{%
+name={PFB},%
+description={Polyphase Filter Bank}%
+}
+\newglossaryentry{lo}{%
+name={lo},%
+description={Local Oscillator}%
+}
+\newglossaryentry{pr}{%
+name={PR},%
+description={Perfect Reconstruction}%
+}
+\newglossaryentry{fpga}{%
+name={FPGA},%
+description={Field Programmable Gate Array}%
+}
+% Title Page
+\title{KAT-7 GPU-accelerated Inverse Polyphase Filterbank}
+\author{Benjamin Hugo}
+
+\begin{document}
+\maketitle
+\pagebreak
+\printglossary[style=long]
+\pagebreak
+\tableofcontents
+\pagebreak
+\section{Introduction}
+At its core Very Long Baseline Interferometry (\gls{vlbi}) is an interferometry process where the output from several radio antennae are 
+combined to form an equivalent output to a telescope of the size equal to the distance between the furthest two antennae in the \gls{vlbi} array.
+For a comprehensive overview of the technique the reader is referred to the detailed introduction by Middelberg et al. \cite{middelberg2008high}. Several
+such extended arrays exist including the European VLBI network and the Very Long Baseline Array. The hope is to include the KAT-7 in future VLBI
+observations.
+
+Traditionally the process required raw data to be dumped to a storage medium, say tape and physically shipped to a correlator where the data from several 
+telescopes could be combined. The new trend in VLBI is to perform real-time correlation between antennae using high-speed internet connections and is known
+as 'eVLBI'. Both the Australian Long Baseline Array and the European VLBI network has performed successful eVLBI observations.
+
+Ultimately the problem being investigated (at least in part by this report) can be boiled down to converting data sent over the SPEAD protocol (employed 
+internally by the KAT-7 array) to the VDIF format. This conversion process includes a necessary first step where the current sampling rate of 800 MHz
+\footnote{According to the KAT-7 Data Interface document} is reduced to 128 MHz through \textit{Digital Downconversion}. The basic operation involves the following three
+steps:
+\begin{enumerate}
+ \item Mixing. Where the signal is shifted down to \textit{baseband} (frequency 0 of the spectrum), by mixing the signal with a tone produced by a Local Oscillator (\gls{lo}).
+ This is simply a generated sine wave at the lower end of the sub-spectrum to be extracted. This is simply done by an element-wise multiplication of the original signal with
+ the local oscillator tone. In essence mixing is not a \textit{linear} (refer to \cite[ch. 5]{smith1997scientist}) process. If $f$ was a single channel in the 
+ frequency domain then mixing produces replicated channels at $f - f_{lo}$ and $f + f_{lo}$.
+ \item Filtering. In order to eliminate aliasing in the frequency domain due to mixing and frequencies above the new sampling rate we use a Finite Impulse Response 
+ (\gls{fir}) filter with the cutoff set at the rate $\frac{1}{2}f_{decimated}$ to comply with the Nyquest sampling theorem (see \cite[ch. 3]{smith1997scientist}).
+ \item Interpolation and Decimation. The reader is referred to \url{http://www.dspguru.com/dsp/faqs/multirate/basics} for an overview of the process.  
+\end{enumerate}
+
+There is, however, a further complication to deal with, before this downconversion process. The KAT-7 beamformer produces a series of frequency spectra\footnote{Each 
+with 1024 channels according to the KAT-7 Data Interface}. If no filtering was applied these spectra the undo operation would only have involved applying the inverse
+Discrete Fourier Transform. However, the original voltage data went through a filter-bank operation in a process known as the Polyphase Filter Bank (\gls{pfb}). This
+method is also known as the Weighted Window Overlap method. The reader is referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a
+detailed description on this technique.
+
+The forward \gls{pfb} process can thus be thought of as a very basic analysis filter bank, whereas the inverse process can be thought of as a synthesis filterbank. The 
+key differences between the analysis and synthesis processes are:
+\begin{enumerate}
+ \item If $H[n]$ is the prototype FIR filter and the analysis filter bank uses the subfilters $H_1[n],H_2[n]...H_P[n]$ each of length $N$ then the synthesis filter bank
+ uses the subfilters $\barH_1[N-n-1],\barH_2[N-n-1]...\barH_P[N-n-1]$\footnote{Findings published in an in-house final technical report titled 'A review of polyphase filter 
+ banks and their application'. Daniel Zhou. Air Force Research Laboratory, Information Directorate, Rome Research Site, Rome, New York.}
+\end{enumerate}
+
+
+According to Parishwad Vaidyanathan \cite{vaidyanathan1990multirate} this basic filter bank cannot achieve Perfect Reconstruction (\gls{pr}) and have to be modified in order to
+do so. This involves modifying both the analysis and synthesis filter banks. In our situation this is not plausible, since the only the basic form of an analysis filter bank
+is implemented on Field Programmable Gate Arrays (\gls{fpga}) due to their simple construction and fast evaluation times \cite{vaidyanathan1990multirate}. Vaidyanathan goes on
+to state that the synthesis filter bank requires subfilters of much greater length to obtain reasonably good reconstruction and is therefore computationally prohibiting.
+
+\pagebreak
+\bibliography{inverse_polyphase_filter_bank_report}{}
+\bibliographystyle{plain}
+\end{document}          
