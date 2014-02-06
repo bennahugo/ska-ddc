@@ -4,7 +4,7 @@
 #
 #These commands set up the Grid Environment for your job:
 #PBS -N TEST_DATA_GEN
-#PBS -l nodes=1:ppn=1:series600,walltime=00:01:00
+#PBS -l nodes=1:ppn=1:series600,walltime=00:59:00
 #PBS -q UCTlong
 #
 
@@ -20,8 +20,9 @@ echo "Running on: $(hostname)"
 echo "-----------------------------------------------------------------------"
 
 N=1024
+N_longer_filter=$((N*2))
 P=8
-num_samples_to_use=$((N * P * 12500)) #12500
+num_samples_to_use=$((N * P * 128000))
 output_directory=/scratch/bhugo/data_out
 tone_type=noise
 py_run=/opt/exp_soft/python-2.7.2/bin/python2.7 
@@ -42,6 +43,7 @@ echo -e "--------------------------------------\nDumping test data into: $output
 #invoke scripts
 $py_run $test_suite_dir/tone_generator.py $output_directory/noise.dat $num_samples_to_use $tone_type $N $P
 $py_run $test_suite_dir/filter_generator.py $output_directory/prototype_FIR.dat $N $P
+$py_run $test_suite_dir/filter_generator.py $output_directory/long_prototype_FIR.dat $N_longer_filter $P
 $py_run $test_suite_dir/pfb_generator.py  $output_directory/noise.dat $output_directory/prototype_FIR.dat $output_directory/pfb.dat $output_directory/unfiltered_ffts.dat $num_samples_to_use $N $P
 $py_run $test_suite_dir/ipfb_generator.py $output_directory/pfb.dat $output_directory/prototype_FIR.dat $output_directory/py_ifftedPFB.dat $output_directory/py_ipfb.dat $non_redundant_pfb_output $N $P
 echo -e "$stats" > $output_directory/test_data_characteristics.txt
