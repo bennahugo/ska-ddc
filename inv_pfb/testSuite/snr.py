@@ -16,7 +16,11 @@ the wikipedia article)
 from scipy import *
 import sys
 import numpy as np
-#import scipy.signal
+from pylab import *
+import scipy.signal
+
+
+plotting_on=True
 
 if len(sys.argv) < 4:
     print "provide [REAL tone file], [REAL signal file], [offset to read from in signal file] and [optional: shift if known in advance]"
@@ -43,11 +47,16 @@ def fastRealXCorrelate(signal1,signal2):
     return np.real(np.fft.fftshift(np.fft.ifft(np.fft.fft(padded_s1) * np.fft.fft(padded_s2[::-1]))))
 
 def shiftSignal(signal,time_steps):
+    new_signal = np.zeros(len(signal))
+    for i in range(0,len(signal)):
+	if i + time_steps >= 0 and i + time_steps < len(signal):
+		new_signal[i + time_steps] = signal[i]
+    return new_signal
     '''
     By the shift theorem:
     '''
-    shift_exp = exp(-2 * np.pi * 1.0j * time_steps * np.arange(0,len(signal))/len(signal))
-    return np.real(np.fft.ifft(np.fft.fft(signal) * shift_exp))
+    #shift_exp = exp(-2 * np.pi * 1.0j * time_steps * np.arange(0,len(signal))/len(signal))
+    #return np.real(np.fft.ifft(np.fft.fft(signal) * shift_exp))
         
 def argMax(arr):
     maxV = arr[0]
@@ -61,16 +70,45 @@ def argMax(arr):
 def snr(signal,noise):
     stdev_sig = np.std(signal[0:max(len(signal),len(noise))])
     stdev_noise = np.std(noise[0:max(len(signal),len(noise))])
+    print "SNR stddev x[t]: %f" % stdev_sig
+    print "SNR stddev y[t] - x[t]: %f" % stdev_noise
     return 10 * log10(stdev_sig/stdev_noise)
-computed_shift = 0
-if len(sys.argv) < 5:
-	xCorFast = fastRealXCorrelate(tone,signal)
-	computed_shift = (len(tone) + len(signal) - 1) - (argMax(xCorFast) + 1)
-else:
-	computed_shift = int(sys.argv[4])
+
+
+xCor = fastRealXCorrelate(tone,signal)
+aCor = fastRealXCorrelate(tone,tone)
+max_arg = argMax(xCor)
+max_arg_auto = argMax(aCor)
+scale_factor = sqrt(xCor[max_arg])
+computed_shift = (len(tone) + len(signal) - 1)/2 - (max_arg + 1)
+
 print "Shifted by %d elements" % (computed_shift)
 signal_inv_shifted = shiftSignal(signal,-computed_shift)
+stddev_tone = np.std(tone[:len(tone) - signal_start_offset])
+print "Stddev tone: %f" % (stddev_tone)
+stddev_shift_signal = np.std(signal_inv_shifted)
+print "Stddev inverse shifted signal (without scaling): %f" % (stddev_shift_signal)
+scale_ratio = stddev_tone / stddev_shift_signal
+
+print "Scaling factor: %f" % (scale_ratio)
+signal_inv_shifted *= scale_ratio
 noise = signal_inv_shifted - tone[:len(tone) - signal_start_offset]
 tone_to_noise = snr(tone[:len(tone) - signal_start_offset],noise)
-print "Signal to noise (input tone to noise): %f dB" % tone_to_noise
+print "Signal to noise (input signal to noise): %f dB" % tone_to_noise
 
+if plotting_on:
+	figure(1)
+	title("Comparison of x[y], y[t] and y[t] - x[t]")
+	plot(tone[:len(tone)-signal_start_offset],label="x[t]")
+	plot(signal_inv_shifted,label="c(y[t + (%d)])" % (-computed_shift))
+	plot(noise,label="n[t]")
+	handles, labels = gca().get_legend_handles_labels()
+	gca().legend(handles, labels)
+	
+	figure(2)
+	title("X-correlate x[t] vs. y[t]")
+	plot(xCor)
+	figure(3)
+	title("Auto-correlation of x[t]")
+	plot(aCor)
+	show()
