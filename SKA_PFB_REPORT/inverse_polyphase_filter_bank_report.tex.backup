@@ -4,6 +4,7 @@
 \usepackage{fullpage}
 \usepackage{hyperref}
 \usepackage{amsmath}
+\usepackage{amsfonts}
 \usepackage{graphicx}
 \usepackage{subcaption}
 \usepackage{verbatim}
@@ -40,6 +41,14 @@ description={Field Programmable Gate Array}%
 name={DFT},%
 description={Discrete Fourier Transform}%
 }
+\newglossaryentry{fft}{%
+name={FFT},%
+description={Fast Fourier Tranform is a fast algorithm for computing the \gls{dft} using the Cooley–Tukey algorithm amongst others}%
+}
+\newglossaryentry{snr}{%
+name={SNR},%
+description={Signal to noise ratio}%
+}
 
 \begin{document}
 \begin{titlepage}
@@ -47,6 +56,14 @@ description={Discrete Fourier Transform}%
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for the horizontal lines, change thickness here
 
 \center % Center everything on the page
+ 
+%----------------------------------------------------------------------------------------
+%	LOGO SECTION
+%----------------------------------------------------------------------------------------
+
+\includegraphics[width=0.25\textwidth]{ska_logo_rgb.jpg}\\[1cm] % Include a department/university logo - this will require the graphicx package
+
+%----------------------------------------------------------------------------------------
  
 %----------------------------------------------------------------------------------------
 %	HEADING SECTIONS
@@ -60,7 +77,7 @@ description={Discrete Fourier Transform}%
 %----------------------------------------------------------------------------------------
 
 \HRule \\[0.4cm]
-{ \huge \bfseries KAT-7 GPU-accelerated Inverse Polyphase Filterbank}\\[0.4cm]
+{ \huge \bfseries GPU-accelerated Inverse Polyphase Filterbank}\\[0.4cm]
 \HRule \\[1.5cm]
  
 %----------------------------------------------------------------------------------------
@@ -83,7 +100,7 @@ Benjamin \textsc{Hugo}\\[0.2cm] % Your name
 \emph{Advisor:} \\
 Ludwig Schwardt
 \end{flushright}
-\end{minipage}\\[4cm]
+\end{minipage}\\[3cm]
 
 % If you don't want a supervisor, uncomment the two lines below and remove the section above
 %\Large \emph{Author:}\\
@@ -93,17 +110,11 @@ Ludwig Schwardt
 %	DATE SECTION
 %----------------------------------------------------------------------------------------
 
-{\large \today}\\[3cm] % Date, change the \today to a set date if you want to be precise
-{The results obtained in this report was made possible through the use of the ICTS High Performance HEX cluster 
+{\large \today}\\[2.5cm] % Date, change the \today to a set date if you want to be precise
+{The results obtained in this report were made possible through the use of the ICTS High Performance HEX cluster 
 of the University of Cape Town (UCT) \url{hex.uct.ac.za}. The author wishes to thank Andrew Lewis of UCT ICTS for 
 the technical support he provided during this project.}
-%----------------------------------------------------------------------------------------
-%	LOGO SECTION
-%----------------------------------------------------------------------------------------
 
-%\includegraphics{Logo}\\[1cm] % Include a department/university logo - this will require the graphicx package
- 
-%----------------------------------------------------------------------------------------
 
 \vfill % Fill the rest of the page with whitespace
 
@@ -112,6 +123,8 @@ the technical support he provided during this project.}
 \printglossary[style=long]
 \pagebreak
 \tableofcontents
+\pagebreak
+\listoffigures
 \pagebreak
 \section{Introduction}
 At its core Very Long Baseline Interferometry (\gls{vlbi}) is an interferometry process where the output from several radio antennae are 
@@ -171,7 +184,7 @@ This confirms that our basic analysis filter bank construction is correct.
   \includegraphics[width=0.95\textwidth]{filtered.png}
   \caption{Filtered analysis filter bank}
  \end{subfigure}
-\caption{Example of \gls{dft} leakage. It is clear that the unfiltered analysis filter bank suffers severely when containing frequencies even slightly off the bin centers
+\caption[\gls{dft} Leakage]{Example of \gls{dft} leakage. It is clear that the unfiltered analysis filter bank suffers severely when containing frequencies even slightly off the bin centers
 	 of the \gls{dft}. Its filtered counterpart produces crisp binning of both centered and uncentered frequencies.}
 \label{filtered_and_unfiltered_analysis}
 \end{figure}
@@ -204,19 +217,17 @@ said, as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ show
   \includegraphics[width=0.95\textwidth]{auto_cor.png}
   \caption{Auto correlation of $x[t]$}
  \end{subfigure}
-\caption{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed- and input signals is 
+\caption[Correlation between synthesis filter bank and input]{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed- and input signals is 
 about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\dot (P-1)$. This observation was made for 
 trials with input signals of different lengths, but we have not rigorously proven this and it should not be taken as a fact. Future expansion, testing and debugging should use
 the cross correlation to determine $\Delta$.}
 \label{correlation}
 \end{figure}
 
-{\color{red} TODO:::::Discuss SNR once Ludwig has confirmed it is correct...}
-
 \subsection{Validation of the GPU version}
 We will for now only focus on the most basic construction to determine what throughput rates can be achieved, as well as the quality of the reconstruction. The full source code
 along with test and analysis suite should be included with this report. With this suite the C++ CUDA GPU code is validated against a serial python implementation. The reader 
-should have GCC 4.6 installed, along with the NVIDIA NVCC compiler toolkit 5.0 redistributable. Although the code should work on any platform we have only tested this under 
+should have GCC 4.6 installed, along with the NVIDIA NVCC compiler toolkit 5.0 redistributable. Although the code should work on any platform, we have only tested this under 
 recent GNU/Linux kernels. Another requirement is that the user have a Compute Capability $\geq2.0$ installed on their system. To run the test suite the user should have 
 Python 2.7 along with the SciLab suite of packages installed (including NumPy, SciPy and MatPlotLab).
 
@@ -242,7 +253,7 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
 \end{center}
 
 This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we discarded the last non-redundant
-sample of FFT output. Different FFT implementations may behave differently under this situation and may produce slightly different results. It should be noted
+sample of \gls{fft} output. Different \gls{fft} implementations may behave differently under this situation and may produce slightly different results. It should be noted
 that here the GPU has processed the file in several batches as we will explain next.
 
 \subsection{Optimizations on the GPU-accelerated synthesis filter bank}
@@ -269,7 +280,7 @@ Care has been taken in optimizing the GPU code according to the architectural re
  better throughputs when multiple threads (usually either a half-warp or warp of 32 threads) access the same element simultaneously. This is not true in our situation and
  using constant memory will result in serialization of the entire group of threads!
  \item In compliance with the limitations of compute capability 2.0\footnote{Compute Capability 2.0 accepts a maximum of 65536 blocks per grid dimension} devices we split the 
- number of blocks executed in each grid between the x and y dimensions of the grid.
+ number of blocks executed in each grid between the $Dim_x$ and $Dim_y$ dimensions of the grid.
  \item As it stands the computations of the basic synthesis filter bank did not require the use of shared memory. If kernels are added at a latter stage care should be taken
  to avoid bank-conflicts between warps of threads. The reader is referred to GPU Gems 3 \cite[ch. 3]{harris2007parallel} for a short introduction to this architectural constraint.
 \end{enumerate}
@@ -278,6 +289,52 @@ The user should manually tweak the memory allocation to fulfill their needs. All
 the card should be completely filled with data in order to achieve good occupancy and offset relatively slow memory transfers through the PCI express bus.
 
 \section{Results}
+\subsection{Quality of the reconstruction}
+In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the signal to noise ratio \gls{snr}. Our results 
+confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in the synthesis.
+Although there is a reasonable correlation, which is confirmed by visual inspection of the (time-shifted) output of the synthesis filter bank.
+
+The \gls{snr} is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank). Note that
+the initial padding, as outputted by the analysis and synthesis filter banks, are discarded and that an equal number of samples at the end of $y[t]$ are ignored. After this
+clamping operation $x[t]$ and $y[t]$ have equal length.
+\begin{enumerate}
+ \item Obtain $\Delta$ through $x[t]\star y[t]$. It is assumed that $x[t],y[t]\in\mathbb{R}^n$.
+ \item The filter bank introduces a scaling factor to the output. This is canceled by scaling $y[t]$ by $c = \frac{\sigma_{x[t]}^2}{\sigma_{y[t]}^2}$. Additionally the shift 
+ introduced by analysis and synthesis is canceled: $y'[t] = c\times y[t-\Delta]$.
+ \item Compute the noise: $n[t] := y'[t]-x[t]$
+ \item Calculate $SNR(x[t],n[t])$ by the equation given below. The input signal $x[t]$ must have $\bar x\approx 0$. Standard Gaussian noise meets this requirement.
+\end{enumerate}
+\begin{equation}
+ SNR(signal[t],noise[t])_{dB}:=10\log_{10}{\frac{\sigma_{signal[t]}^2}{\sigma_{noise[t]}^2}}
+\end{equation}
+We ensured that the correlation and shifting is functioning properly by passing in a tone that is only non-zero over a subinterval. The results are shown in figure~\ref{shift_test}.
+\begin{figure}[ht!]
+  \centering
+  \includegraphics[width=0.49\textwidth]{shift_test.png}
+  \caption[Validation of inverse shift for the calculation of the \gls{snr}]{The output tone is shifted to the correct position}
+  \label{shift_test}
+\end{figure}
+
+On 24576 samples the \gls{snr} is equal to 0.063 dB, or equivalently a standard deviation ratio of 1.014. This is a poor reconstruction. Upon further investigation we noticed that
+$\sigma_{signal[t]}^2=27.514$ and $\sigma_{signal[t]}^2=27.117$. This shows that there is a significant amount of noise in the reconstruction. Refer to figure~\ref{snr} for a visual
+inspection of this result.
+\begin{figure}[ht!]
+ \centering
+ \begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=0.95\textwidth]{overview_snr}
+  \caption{Overview}
+ \end{subfigure}
+ \begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=0.95\textwidth]{snr_zoomed.png}
+  \caption{Closeup inspection of the input and output}
+ \end{subfigure}
+\caption[Reconstruction quality]{As is clearly visible there is a significant amount of noise in the synthesized signal. Although there is clearly a a limited correlation ($x[t]$ and $y[t]$ lines up 
+almost perfectly on some of the peaks), at other positions there is almost no correlation. This explains why the signal to noise ratio is near 0 dB, and is indeed a very
+disheartening result.}
+\label{snr}
+\end{figure}
+
+\subsection{GPU Computational performance}
 We have recorded performance measurements on a Tesla M2090 and a single core (Python implementation) of a AMD Opteron 6274 clocked at 2200 MHz with 128 GiB primary memory, 
 clocked at 1333 MHz. These timings include memory transfer costs between the host and the GPU. It would be considered an unfair comparison if they are neglected.
 \begin{figure}[ht!]
@@ -288,7 +345,7 @@ clocked at 1333 MHz. These timings include memory transfer costs between the hos
   File_Size   	Python   	GPU
   78.15		20.48		0.134
   499.916	130.046		0.504
-  999.424	257.812		1.008
+  999.424	258.474		1.008
   }\datatable
 
   \begin{axis}[
@@ -335,21 +392,23 @@ clocked at 1333 MHz. These timings include memory transfer costs between the hos
   \end{tikzpicture}
   \caption{Throughput}
   \end{subfigure} 
-  \caption{These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
+  \caption[GPU performance]{These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
   file of almost 4 GiB the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, 
   show that the GPU memory should be saturated with data in order to offset the memory transfer between the host and device.}
   \label{computation_times}
 \end{figure}
 
-Although this speedup seems remarkably good the author want to caution the reader that, ideally, the optimized GPU version should be compared to an parallel optimized CPU
+Although this speedup seems remarkably good the author wants to caution the reader that, ideally, the optimized GPU version should be compared to an parallel optimized CPU
 version. Not only can we easily parallelize this algorithm using OpenMP, but there is also opportunity here to exploit the full parallel capabilities of modern processors,
 by making use of the special vectorized instruction sets like Intel/AMD Streaming SIMD Extensions or Intel AVX. The latter can perform up to 8 32-bit floating-point
 operations per core simultaneously, by loading 8 elements into a special 256-bit register. This approach, coupled with higher CPU clock speeds may reduce this speedup 
 significantly if executed on an 8 or 16 core server CPU, and by extension the latest Intel Xeon Phi co-processors.
 
 \section{Future works}
-The filterbank operation has complexity of $O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also 
-increase in a linear fashion. The next investigation should focus on extending the lengths of the subfilters in order to obtain better reconstructions.
+There is a clear need for an investigation into extending the lengths of the subfilters in order to obtain better reconstructions. The filterbank operation has complexity of 
+$O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also increase in a linear fashion. The author 
+notes that this will require a slight adjustment in both the Python and GPU implementations where the number of FFT bins and subfilter lengths are not assumed to be equal, 
+as per the basic construction.
 \pagebreak
 \bibliography{inverse_polyphase_filter_bank_report}{}
 \bibliographystyle{plain}

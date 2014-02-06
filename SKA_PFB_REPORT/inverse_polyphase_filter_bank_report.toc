@@ -1,7 +1,9 @@
-\contentsline {section}{\numberline {1}Introduction}{3}{section.1}
-\contentsline {section}{\numberline {2}Method}{3}{section.2}
-\contentsline {subsection}{\numberline {2.1}Validation of the forward and inverse processes}{3}{subsection.2.1}
-\contentsline {subsection}{\numberline {2.2}Validation of the GPU version}{5}{subsection.2.2}
-\contentsline {subsection}{\numberline {2.3}Optimizations on the GPU-accelerated synthesis filter bank}{6}{subsection.2.3}
-\contentsline {section}{\numberline {3}Results}{7}{section.3}
-\contentsline {section}{\numberline {4}Future works}{8}{section.4}
+\contentsline {section}{\numberline {1}Introduction}{4}{section.1}
+\contentsline {section}{\numberline {2}Analysis and design}{4}{section.2}
+\contentsline {subsection}{\numberline {2.1}Validation of the forward and inverse processes}{4}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Validation of the GPU version}{6}{subsection.2.2}
+\contentsline {subsection}{\numberline {2.3}Optimizations on the GPU-accelerated synthesis filter bank}{7}{subsection.2.3}
+\contentsline {section}{\numberline {3}Results and discussion}{8}{section.3}
+\contentsline {subsection}{\numberline {3.1}Quality of the reconstruction}{8}{subsection.3.1}
+\contentsline {subsection}{\numberline {3.2}GPU Computational performance}{8}{subsection.3.2}
+\contentsline {section}{\numberline {4}Future works}{9}{section.4}
