@@ -125,6 +125,7 @@ the technical support he provided during this project.}
 \tableofcontents
 \pagebreak
 \listoffigures
+\listoftables
 \pagebreak
 \section{Introduction}
 At its core Very Long Baseline Interferometry (\gls{vlbi}) is an interferometry process where the output from several radio antennae are 
@@ -157,7 +158,7 @@ through a filter-bank operation, in a process known as the Polyphase Filter Bank
 Short Time Discrete Fourier Transforms subsections of very long signals. The reader is referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a detailed 
 description on the forward \gls{pfb}.
 
-\section{Method}
+\section{Analysis and design}
 \subsection{Validation of the forward and inverse processes}
 The forward \gls{pfb} process can be thought of as a very basic analysis filter bank, whereas the inverse process can be thought of as a synthesis filter bank. The 
 analysis filter bank uses a Hamming-windowed \gls{fir} with $P=8$ banks of $N=1024$ elements, with no up or down-sampling stages \footnote{According to information provided by Jason Manley}.
@@ -238,7 +239,8 @@ is defined as:
 \end{equation}
 
 By generating 0.976 GiB of Gaussian noise we determined these following characteristics for the two output files:
-\begin{center}
+\begin{table}
+  \centering
   \begin{tabular}{|c|c|c|}
     \hline
     \textbf{Metric} & \textbf{Python Synthesis Bank} & \textbf{GPU Synthesis Bank} \\
@@ -250,7 +252,8 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
     \textbf{Mean Squared Error} & \multicolumn{2}{|c|}{\textbf{0.000001}} \\
     \hline
   \end{tabular}
-\end{center}
+  \caption[Validation of the GPU version]{Results from validating the GPU version against the serial python version of the synthesis filter bank}
+\end{table}
 
 This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we discarded the last non-redundant
 sample of \gls{fft} output. Different \gls{fft} implementations may behave differently under this situation and may produce slightly different results. It should be noted
@@ -288,7 +291,7 @@ Care has been taken in optimizing the GPU code according to the architectural re
 The user should manually tweak the memory allocation to fulfill their needs. All these constants are defined in the header file {\verb inv_pfb.h }. It should be pointed out that 
 the card should be completely filled with data in order to achieve good occupancy and offset relatively slow memory transfers through the PCI express bus.
 
-\section{Results}
+\section{Results and discussion}
 \subsection{Quality of the reconstruction}
 In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the signal to noise ratio \gls{snr}. Our results 
 confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in the synthesis.
