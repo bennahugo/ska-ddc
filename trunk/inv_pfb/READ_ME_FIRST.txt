@@ -1,5 +1,5 @@
 INVERSE POLYPHASE FILTERBANK
-README v0.1 (PRE-RELEASE)
+README v1.0 (RELEASE)
 Author: Benjamin Hugo
 --------------------------------------------------------------------
 Previous testing environment:
@@ -17,7 +17,7 @@ To compile the cuda code:
 2. Hit 'cmake ../'. This will locate the necessary cuda libraries and link them appropriately for your system. 
 3. Now you can hit 'make' to compile the source.
 
-To tweak filtering coefficients
+To tweak filtering and or other coefficients 
 --------------------------------------------------------------------
 All the constants should be located in inv_pfb.h
 
@@ -29,10 +29,10 @@ In that directory you will find the python versions of the pfb and inverse pfb p
 along with a few other script. Don't bother modifying those unless you're bug fixing. 
 
 Locate the BASH script construct_test_data.sh. In this script you can configure the filtering coefficients and number of 
-test samples (as well as their type: 'sine', 'impulse' or 'noise'). Executing that script will dump a fake tone, prototype filter (to be used for both analysis and synthesis),
+test samples (as well as their type: 'sine', 'impulse' or 'noise'). Executing that script will dump a fake signal, prototype filter (to be used for both analysis and synthesis),
 forward pfb output and inverse pfb output. You can use this to test the CUDA code.
 
-There should be a 'correlator.py' X-correlator, as well as a mean squared error 'diff_real_inputs.py' (takes only two REAL-valued streams) included to aid you in any validation.
+There should be a 'correlator.py' X-correlator, a mean squared error 'diff_real_inputs.py' and a signal to noise 'snr.py' analyser included (the last two takes only two REAL-valued streams) included to aid you in any validation.
 
 To run the CUDA code
 --------------------------------------------------------------------
