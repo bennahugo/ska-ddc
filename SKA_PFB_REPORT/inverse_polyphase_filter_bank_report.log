@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.4-1.40.13 (TeX Live 2012/Debian) (format=pdflatex 2013.8.19)  6 FEB 2014 02:09
+This is pdfTeX, Version 3.1415926-2.4-1.40.13 (TeX Live 2012/Debian) (format=pdflatex 2013.8.19)  6 FEB 2014 08:39
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -952,22 +952,22 @@ port.glo on input line 14.
 (./inverse_polyphase_filter_bank_report.aux)
 \openout1 = `inverse_polyphase_filter_bank_report.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 44.
-LaTeX Font Info:    ... okay on input line 44.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 48.
+LaTeX Font Info:    ... okay on input line 48.
 \AtBeginShipoutBox=\box43
-Package hyperref Info: Link coloring OFF on input line 44.
+Package hyperref Info: Link coloring OFF on input line 48.
 
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2010/04/30 v2.40 Cross-referencing by name of section
@@ -977,9 +977,9 @@ Package: gettitlestring 2010/12/03 v1.4 Cleanup title references (HO)
 )
 \c@section@level=\count151
 )
-LaTeX Info: Redefining \ref on input line 44.
-LaTeX Info: Redefining \pageref on input line 44.
-LaTeX Info: Redefining \nameref on input line 44.
+LaTeX Info: Redefining \ref on input line 48.
+LaTeX Info: Redefining \pageref on input line 48.
+LaTeX Info: Redefining \nameref on input line 48.
 
 (./inverse_polyphase_filter_bank_report.out)
 (./inverse_polyphase_filter_bank_report.out)
@@ -1027,14 +1027,14 @@ r_bank_report.gls)pdfTeX warning (ext4): destination with the same identifier (
 name{page.1}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.114 \tableofcontents
+l.118 \tableofcontents
                        [1] (./inverse_polyphase_filter_bank_report.toc)
 \tf@toc=\write7
 \openout7 = `inverse_polyphase_filter_bank_report.toc'.
 
 
 [2] [3]
-Overfull \hbox (6.24327pt too wide) in paragraph at lines 156--159
+Overfull \hbox (6.24327pt too wide) in paragraph at lines 160--163
 []\OT1/cmr/m/n/10 If $\OML/cmm/m/it/10 H\OT1/cmr/m/n/10 [\OML/cmm/m/it/10 n\OT1
 /cmr/m/n/10 ]$ is the pro-to-type FIR fil-ter and the anal-y-sis fil-ter bank u
 ses the sub-fil-ters $\OML/cmm/m/it/10 H[]\OT1/cmr/m/n/10 [\OML/cmm/m/it/10 n\O
@@ -1043,36 +1043,36 @@ r/m/n/10 ] [] \OML/cmm/m/it/10 H[]\OT1/cmr/m/n/10 [\OML/cmm/m/it/10 n\OT1/cmr/m
 /n/10 ]$
  []
 
-<unfiltered.png, id=97, 586.8324pt x 442.2924pt>
+<unfiltered.png, id=95, 586.8324pt x 442.2924pt>
 File: unfiltered.png Graphic file (type png)
  <use unfiltered.png>
-Package pdftex.def Info: unfiltered.png used on input line 167.
+Package pdftex.def Info: unfiltered.png used on input line 171.
 (pdftex.def)             Requested size: 215.15906pt x 162.16087pt.
 
-<filtered.png, id=99, 419.31656pt x 164.11313pt>
+<filtered.png, id=97, 419.31656pt x 164.11313pt>
 File: filtered.png Graphic file (type png)
  <use filtered.png>
-Package pdftex.def Info: filtered.png used on input line 171.
+Package pdftex.def Info: filtered.png used on input line 175.
 (pdftex.def)             Requested size: 215.15906pt x 84.20993pt.
 
-Overfull \hbox (2.22221pt too wide) in paragraph at lines 166--175
+Overfull \hbox (2.22221pt too wide) in paragraph at lines 170--179
 []$[]$ $[]$ 
  []
 
 [4 <./unfiltered.png> <./filtered.png>]
-<x_cor.png, id=118, 586.8324pt x 442.2924pt>
+<x_cor.png, id=116, 586.8324pt x 442.2924pt>
 File: x_cor.png Graphic file (type png)
  <use x_cor.png>
-Package pdftex.def Info: x_cor.png used on input line 199.
+Package pdftex.def Info: x_cor.png used on input line 204.
 (pdftex.def)             Requested size: 215.15906pt x 162.16087pt.
 
-<auto_cor.png, id=119, 586.8324pt x 442.2924pt>
+<auto_cor.png, id=117, 586.8324pt x 442.2924pt>
 File: auto_cor.png Graphic file (type png)
  <use auto_cor.png>
-Package pdftex.def Info: auto_cor.png used on input line 203.
+Package pdftex.def Info: auto_cor.png used on input line 208.
 (pdftex.def)             Requested size: 215.15906pt x 162.16087pt.
 
-Overfull \hbox (2.22221pt too wide) in paragraph at lines 198--209
+Overfull \hbox (2.22221pt too wide) in paragraph at lines 203--214
 []$[]$ $[]$ 
  []
 
@@ -1085,7 +1085,7 @@ See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.305   \end{axis}
+l.310   \end{axis}
                   
 This error message was generated by an \errmessage
 command, so I can't give any explicit help.
@@ -1093,7 +1093,7 @@ Pretend that you're Hercule Poirot: Examine all clues,
 and deduce the truth by order and method.
 
 
-Overfull \hbox (111.92174pt too wide) in paragraph at lines 307--308
+Overfull \hbox (111.92174pt too wide) in paragraph at lines 312--313
 [][] 
  []
 
@@ -1105,32 +1105,32 @@ See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.332   \end{axis}
+l.337   \end{axis}
                   
 (That was another \errmessage.)
 
 
-Overfull \hbox (111.92174pt too wide) in paragraph at lines 334--335
+Overfull \hbox (111.92174pt too wide) in paragraph at lines 339--340
 [][] 
  []
 
 [7] (./inverse_polyphase_filter_bank_report.bbl [8])
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 355.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 362.
  [9]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 355.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 362.
 
 (./inverse_polyphase_filter_bank_report.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 355.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 355.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 362.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 362.
 Package rerunfilecheck Info: File `inverse_polyphase_filter_bank_report.out' ha
 s not changed.
 (rerunfilecheck)             Checksum: 1267D8FA931E6883ACF21BD4AFBDA23A;458.
  ) 
 Here is how much of TeX's memory you used:
- 24760 strings out of 495059
- 526937 string characters out of 3182030
- 685174 words of memory out of 3000000
- 27428 multiletter control sequences out of 15000+200000
+ 24788 strings out of 495059
+ 527337 string characters out of 3182030
+ 685847 words of memory out of 3000000
+ 27457 multiletter control sequences out of 15000+200000
  11693 words of font info for 42 fonts, out of 3000000 for 9000
  14 hyphenation exceptions out of 8191
  63i,22n,94p,1477b,2124s stack positions out of 5000i,500n,10000p,200000b,50000s
@@ -1151,11 +1151,11 @@ xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/t
 exmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-d
 ist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fo
 nts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on inverse_polyphase_filter_bank_report.pdf (10 pages, 338723 by
+Output written on inverse_polyphase_filter_bank_report.pdf (10 pages, 338593 by
 tes).
 PDF statistics:
- 235 PDF objects out of 1000 (max. 8388607)
- 195 compressed objects within 2 object streams
- 52 named destinations out of 1000 (max. 500000)
+ 233 PDF objects out of 1000 (max. 8388607)
+ 193 compressed objects within 2 object streams
+ 51 named destinations out of 1000 (max. 500000)
  89 words of extra memory for PDF output out of 10000 (max. 10000000)
 

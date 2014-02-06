@@ -5,6 +5,8 @@
 		\setentrycounter[]{page}\glsnumberformat{3\delimN 4}\delimN 
 		\setentrycounter[]{page}\glsnumberformat{6}}}\glsgroupskip
 \glsgroupheading{F}\relax \glsresetentrylist %
+\glossaryentryfield{fft}{\glsnamefont{FFT}}{Fast Fourier Tranform is a fast algorithm for computing the \gls {dft} using the Cooley–Tukey algorithm amongst others}{\relax }{\glossaryentrynumbers{\relax 
+		\setentrycounter[]{page}\glsnumberformat{6}}}%
 \glossaryentryfield{fir}{\glsnamefont{FIR}}{Finite Impulse Response}{\relax }{\glossaryentrynumbers{\relax 
 		\setentrycounter[]{page}\glsnumberformat{3\delimN 4}\delimN 
 		\setentrycounter[]{page}\glsnumberformat{6}}}%
