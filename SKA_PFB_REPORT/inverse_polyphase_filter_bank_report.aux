@@ -25,10 +25,24 @@
 \citation{smith1997scientist}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{3}{section.1}}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Method}{3}{section.2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Validation of the forward and inverse processes}{3}{subsection.2.1}}
 \citation{vaidyanathan1990multirate}
 \citation{vaidyanathan1990multirate}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Example of \gls {dft} leakage. It is clear that the unfiltered analysis filter bank suffers severely when containing frequencies even slightly off the bin centers of the \gls {dft}. Its filtered counterpart produces crisp binning of both centered and uncentered frequencies.\relax }}{4}{figure.caption.4}}
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{filtered_and_unfiltered_analysis}{{1}{4}{Example of \gls {dft} leakage. It is clear that the unfiltered analysis filter bank suffers severely when containing frequencies even slightly off the bin centers of the \gls {dft}. Its filtered counterpart produces crisp binning of both centered and uncentered frequencies.\relax \relax }{figure.caption.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed and input signals is about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\mathaccentV {dot}05F(P-1)$. This observation was made for trials with input signals of different lengths, but we have not rigorously proven this and it should not be taken as a fact. Future expansion, testing and debugging should use the cross correlation to determine $\Delta $.\relax }}{5}{figure.caption.5}}
+\newlabel{correlation}{{2}{5}{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed and input signals is about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\dot (P-1)$. This observation was made for trials with input signals of different lengths, but we have not rigorously proven this and it should not be taken as a fact. Future expansion, testing and debugging should use the cross correlation to determine $\Delta $.\relax \relax }{figure.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Validation of the GPU version}{5}{subsection.2.2}}
+\citation{harris2007parallel}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Optimizations on the GPU-accelerated synthesis filter bank}{6}{subsection.2.3}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Results}{7}{section.3}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger file of almost 4 GiB the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, show that the GPU memory should be saturated with data in order to offset the memory transfer between the host and device.\relax }}{7}{figure.caption.6}}
+\newlabel{computation_times}{{3}{7}{These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger file of almost 4 GiB the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, show that the GPU memory should be saturated with data in order to offset the memory transfer between the host and device.\relax \relax }{figure.caption.6}{}}
 \bibdata{inverse_polyphase_filter_bank_report}
-\bibcite{middelberg2008high}{1}
-\bibcite{smith1997scientist}{2}
-\bibcite{vaidyanathan1990multirate}{3}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Future works}{8}{section.4}}
+\bibcite{harris2007parallel}{1}
+\bibcite{middelberg2008high}{2}
+\bibcite{smith1997scientist}{3}
+\bibcite{vaidyanathan1990multirate}{4}
 \bibstyle{plain}

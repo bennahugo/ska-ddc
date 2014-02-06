@@ -1,5 +1,10 @@
 \begin{thebibliography}{1}
 
+\bibitem{harris2007parallel}
+Mark Harris, Shubhabrata Sengupta, and John~D Owens.
+\newblock Parallel prefix sum (scan) with cuda.
+\newblock {\em GPU gems}, 3(39):851--876, 2007.
+
 \bibitem{middelberg2008high}
 Enno Middelberg and Uwe Bach.
 \newblock High resolution radio astronomy using very long baseline
