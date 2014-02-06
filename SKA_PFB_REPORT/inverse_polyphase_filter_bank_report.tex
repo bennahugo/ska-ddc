@@ -129,12 +129,12 @@ the technical support he provided during this project.}
 \pagebreak
 \section{Introduction}
 At its core Very Long Baseline Interferometry (\gls{vlbi}) is an interferometry process where the output from several radio antennae are 
-combined, to form an equivalent output to a telescope of the size equal to the distance between the furthest two antennae in the \gls{vlbi} array.
-For a comprehensive overview of the technique the reader is referred to the detailed introduction by Middelberg et al. \cite{middelberg2008high}. Several
-such extended arrays exist including the European VLBI network and the Very Long Baseline Array. The hope is to include the KAT-7 in future VLBI
-observations.
+combined, to form an equivalent output to a telescope of the size equal to the distance between the furthest two antennae in the \gls{vlbi} array. These
+arrays spans over very large areas or entire continents. For a comprehensive overview of the technique the reader is referred to the detailed introduction 
+by Middelberg et al. \cite{middelberg2008high}. Several such extended arrays exist including the European VLBI network and the Very Long Baseline Array. The 
+hope is to include the KAT-7 in future VLBI observations.
 
-Traditionally the process required raw data to be dumped to a storage medium, say tape and physically shipped to a correlator where the data from several 
+Traditionally the process required raw data to be dumped to a storage medium, say tape, and physically shipped to a correlator where the data from several 
 telescopes could be combined. The new trend in VLBI is to perform real-time correlation between antennae using high-speed internet connections and is known
 as 'eVLBI'. Both the Australian Long Baseline Array and the European VLBI network have performed successful eVLBI observations.
 
@@ -143,41 +143,41 @@ internally by the KAT-7 array) to the VDIF format. This conversion process inclu
 \footnote{According to the KAT-7 Data Interface document} is reduced to 128 MHz through \textit{Digital Downconversion}. The basic operation involves the following three
 steps:
 \begin{enumerate}
- \item Mixing. Where the signal is shifted down to \textit{baseband} (frequency 0 of the spectrum), by mixing the signal with a tone produced by a Local Oscillator (\gls{lo}).
- This is simply a generated sine wave at the lower end of the sub-spectrum to be extracted. This is simply done by an element-wise multiplication of the original signal with
- the local oscillator tone. In essence mixing is not a \textit{linear} (refer to \cite[ch. 5]{smith1997scientist}) process. If $f$ was a single channel in the 
- frequency domain then mixing produces replicated channels at $f - f_{lo}$ and $f + f_{lo}$.
- \item Filtering. In order to eliminate aliasing in the frequency domain due to mixing and frequencies above the new sampling rate we use a Finite Impulse Response 
- (\gls{fir}) filter with the cutoff set at the rate $\frac{1}{2}f_{decimated}$ to comply with the Nyquest sampling theorem (see \cite[ch. 3]{smith1997scientist}).
+ \item Mixing. Where the signal is shifted down to \textit{baseband} (frequency 0 of the spectrum), by mixing the signal with a Local Oscillator (\gls{lo}).
+ The \gls{lo} is simply a generated sine wave with its frequency equal to the lower end of the sub-spectrum to be extracted. Mixing is achieved through an 
+ element-wise multiplication of the original signal with the \gls{lo} tone. In essence mixing is not a \textit{linear} (refer to \cite[ch. 5]{smith1997scientist}) 
+ process. If $f$ was a single channel in the frequency domain then mixing produces replicated channels at $f - f_{lo}$ and $f + f_{lo}$.
+ \item Filtering. In order to eliminate aliasing in the frequency domain, due to mixing and frequencies above the new sampling rate, a Finite Impulse Response 
+ (\gls{fir}) filter with its cutoff set at the rate $\frac{1}{2}f_{decimated}$ is used to comply with the Nyquest sampling theorem (see \cite[ch. 3]{smith1997scientist}).
  \item Interpolation and Decimation. The reader is referred to \url{http://www.dspguru.com/dsp/faqs/multirate/basics} for an overview of the process.  
 \end{enumerate}
 
-There is, however, a further complication to deal with, before this downconversion process can begin. The KAT-7 beamformer produces a series of frequency spectra. If no filtering 
+There is, however, a further complication to deal with, before this downconversion process can begin: the KAT-7 beamformer produces a series of frequency spectra. If no filtering 
 was applied to these spectra, the undo operation would only have involved applying the inverse Discrete Fourier Transform (\gls{dft}). However, the original voltage data went 
 through a filter-bank operation, in a process known as the Polyphase Filter Bank (\gls{pfb}). This method is also known as the Weighted Window Overlap method and is necessary for computing 
-Short Time Discrete Fourier Transforms subsections of very long signals. The reader is referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a detailed 
-description on the forward \gls{pfb}.
+Short Time Discrete Fourier Transforms on subsections of very long signals. The reader is referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a detailed 
+description on the forward \gls{pfb} process.
 
-This report first discusses the validation techniques we employed to test both the construction of the analysis and synthesis filter banks, along with the validation of our GPU 
-code. We then provide an overview of our design and optimization techniques for the GPU version of the filter bank, before discussing the quality of the reconstructed signal and
-GPU performance.
+This report first discusses the validation techniques we employed to test both the construction of the analysis and synthesis filter banks of the \gls{pfb} and inverse \gls{pfb}, 
+along with the validation of our GPU code. We then provide an overview of our design and optimization techniques for the GPU version of the filter bank, before discussing the quality of 
+the reconstructed signal and GPU performance.
 \section{Analysis and design}
 \subsection{Validation of the forward and inverse processes}
 The forward \gls{pfb} process can be thought of as a very basic analysis filter bank, whereas the inverse process can be thought of as a synthesis filter bank. The 
-analysis filter bank uses a Hamming-windowed \gls{fir} with $P=8$ banks of $N=1024$ elements, with no up or down-sampling stages \footnote{According to information provided by Jason Manley}.
-Our implementation focusses on 8-bit sized samples produced by the KAT-7 beamformer \footnote{According to the KAT-7 Data Interface document}, but could easily adapted to other sample-sizes,
+analysis filter bank uses a Hamming-windowed \gls{fir} with $P=8$ banks of $N=1024$ elements, with no up- or down-sampling stages \footnote{According to information provided by Jason Manley}.
+Our implementation focuses on 8-bit-sized samples produced by the KAT-7 beamformer \footnote{According to the KAT-7 Data Interface document}, but could easily adapted to other sample-sizes,
 as well as prototype filter lengths.
 
 The key differences between the analysis and synthesis processes are:
 \begin{enumerate}
- \item If $H[n]$ is the prototype FIR filter and the analysis filter bank uses the subfilters $H_1[n], H_2[n] \dots H_P[n]$ each of length $N$ then the synthesis filter bank
+ \item If $H[n]$ is the prototype FIR filter and the analysis filter bank uses the subfilters $H_1[n], H_2[n] \dots H_P[n]$, each of length $N$, then the synthesis filter bank
  uses the subfilters $\bar H_1[N-n-1], \bar H_2[N-n-1] \dots \bar H_P[N-n-1]$\footnote{Findings published in an in-house final technical report titled 'A review of polyphase filter 
- banks and their application'. Daniel Zhou. Air Force Research Laboratory, Information Directorate, Rome Research Site, Rome, New York.}
- \item The commutator is flipped around (as shown on page 10 of Zhou's report) and therefore the sub filters should be processed in reverse order.
+ banks and their application'. Daniel Zhou. Air Force Research Laboratory, Information Directorate, Rome Research Site, Rome, New York}.
+ \item The commutator is flipped around (as shown on page 10 of Zhou's report) and therefore the subfilters should be processed in reverse order.
 \end{enumerate}
 
 We've implemented both the basic analysis and synthesis filter banks, as well as the necessary tools to analyse the performance of this basic filter bank construction. As shown in 
-figure~\ref{filtered_and_unfiltered_analysis} the analysis filter bank successfully limits leakage of any frequencies that lie between neighbouring bin centers of the \gls{dft}.
+figure~\ref{filtered_and_unfiltered_analysis} the analysis filter bank successfully limits leakage of any frequencies that lie between neighboring bin centers of the \gls{dft}.
 This confirms that our basic analysis filter bank construction is correct.
 \begin{figure}[h]
  \begin{subfigure}{0.5\textwidth}
@@ -194,7 +194,7 @@ This confirms that our basic analysis filter bank construction is correct.
 \end{figure}
 
 The synthesis filter bank construction was tested through cross correlation with the original input signal. A surefire way of determining if there is a 
-correlation between the two intput and output of the sythesis filter bank, is to use Gaussian noise as input signal. Perfect Reconstruction (\gls{pr}) requires that the signal 
+correlation between the input and the output of the sythesis filter bank, is to use Gaussian noise as input signal. Perfect Reconstruction (\gls{pr}) requires that the signal 
 only varies in the following two ways:
 \begin{enumerate}
  \item The output signal may be shifted by some $\Delta$ time steps.
@@ -207,9 +207,9 @@ The signal shift may be found by the following method (where $x[t]$ is the input
 \end{equation}
 
 According to Parishwad Vaidyanathan \cite{vaidyanathan1990multirate} this basic filter bank cannot achieve \gls{pr} and have to be modified in order to do so. This involves 
-modifying both the analysis and synthesis filter banks. In our situation this is not plausible, since the only the basic form of analysis filter bank is implemented 
-on Field Programmable Gate Arrays (\gls{fpga}) due to their simple construction and \textit{fast evaluation times} \cite{vaidyanathan1990multirate}. Vaidyanathan goes on to state, 
-however, that the synthesis filter bank requires subfilters of much greater length to obtain reasonably good reconstruction and is therefore computationally prohibiting. That 
+modifying both the analysis and synthesis filter banks. In our situation this is not plausible, since only the basic form of analysis filter bank is implemented 
+on Field Programmable Gate Arrays (\gls{fpga}) in the current production environment. This is due to their simple construction and \textit{fast evaluation times} \cite{vaidyanathan1990multirate}. 
+Vaidyanathan goes on to state, however, that the synthesis filter bank requires subfilters of much greater length to obtain reasonably good reconstruction and is therefore computationally prohibiting. That 
 said, as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ shows that our basic synthesis filter bank achieves limited reconstruction.
 
 \begin{figure}
@@ -221,19 +221,19 @@ said, as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ show
   \includegraphics[width=0.95\textwidth]{auto_cor.png}
   \caption{Auto correlation of $x[t]$}
  \end{subfigure}
-\caption[Correlation between synthesis filter bank and input]{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed- and input signals is 
-about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\dot (P-1)$. This observation was made for 
-trials with input signals of different lengths, but we have not rigorously proven this and it should not be taken as a fact. Future expansion, testing and debugging should use
+\caption[Correlation between synthesis filter bank and input]{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed- and 
+input signals is about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\dot (P-1)$. This observation was made for 
+trials with input signals of different lengths, but we have not rigorously proven this, and it should not be taken as a fact. Future expansion, testing and debugging should use
 the cross correlation to determine $\Delta$.}
 \label{correlation}
 \end{figure}
 
 \subsection{Validation of the GPU version}
-We will for now only focus on the most basic construction to determine what throughput rates can be achieved, as well as the quality of the reconstruction. The full source code
-along with test and analysis suite should be included with this report. With this suite the C++ CUDA GPU code is validated against a serial python implementation. The reader 
+We will, for now, only focus on the most basic filter bank construction to determine what throughput rates can be achieved, as well as the quality of the reconstruction. The full source code
+along with test and analysis suite should be included with this report. With this suite the C++ CUDA GPU code can be validated against a serial python implementation. The reader 
 should have GCC 4.6 installed, along with the NVIDIA NVCC compiler toolkit 5.0 redistributable. Although the code should work on any platform, we have only tested this under 
-recent GNU/Linux kernels. Another requirement is that the user have a Compute Capability $\geq2.0$ installed on their system. To run the test suite the user should have 
-Python 2.7 along with the SciLab suite of packages installed (including NumPy, SciPy and MatPlotLab).
+recent GNU/Linux kernels. Another requirement is that the user have a GPU of Compute Capability $\geq2.0$ installed on their system. In order to run the test suite the user should have 
+Python 2.7 along with the SciLab suite of packages installed (including NumPy, SciPy and MatplotLab).
 
 In order to validate that the GPU version is in fact producing valid results we've tested it against the output of our Python synthesis filter bank. The Mean Squared Error 
 is defined as:
@@ -258,47 +258,49 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
   \caption[Validation of the GPU version]{Results from validating the GPU version against the serial python version of the synthesis filter bank}
 \end{table}
 
-This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we discarded the last non-redundant
-sample of \gls{fft} output. Different \gls{fft} implementations may behave differently under this situation and may produce slightly different results. It should be noted
-that here the GPU has processed the file in several batches as we will explain next.
+This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we have discarded the last non-redundant
+sample of \gls{fft} output (explained shortly). Different \gls{fft} implementations may behave differently under this situation and may produce slightly different results. 
+It should be noted that here the GPU has processed the file in several batches as we will explain next.
 
 \subsection{Optimizations on the GPU-accelerated synthesis filter bank}
 The GPU version has been constructed with the requirements of real-time operation in mind. Although it has not been integrated into a SPEAD receiver, the device simply has
-to be initialized once. The GPU will allocate all the memory it requires during this initialization process. After this initialization step the user can send batches of any size 
-off to the GPU for processing on a rolling bases, as long as one batch is fully processed before the next batch is started. The GPU inverts all the \gls{dft}s in a combined operation  
-and keeps track of the last $P\times N$ $N$-sized inverse \gls{dft}, by keeping a persistent buffer between batches. The only hard constraint placed on this batching process is that 
-the size of the batch is an integral multiple of $N$ (the length of each analysis spectrum as mentioned earlier). At this point we wish to make the reader aware of subtlety in the 
-output data received from the beamformers. Although a real-valued inverse \gls{dft} will require $\frac{N}{2}+1$ non-redundant samples to perform a computation the last frequency bin 
-is discarded before we receive it. The author has assumed $X_{filtered}[f=\frac{N}{2}+1] = 0$ in his construction of the analysis and synthesis filterbanks.
+to be initialized once. The GPU will allocate all the memory it requires during this initialization process, after which the user can send batches, of any size, 
+off to the GPU for processing. The user can send these batches on a rolling bases, as long as one batch is fully processed before the next batch is started. The GPU inverts 
+all the \gls{dft}s in a combined operation and keeps track of the last $P\times N$ $N$-sized inverse \gls{dft}s. This is achieved by keeping a persistent buffer between batches. 
+The only hard constraint placed on this batching process is that the size of the batch is an integral multiple of $\frac{N}{2}$ (the length of each analysis spectrum as mentioned earlier). At 
+this point we wish to make the reader aware of subtlety in the output data received from the beamformers. Although a real-valued inverse \gls{dft} will require $\frac{N}{2}+1$ non-redundant 
+samples to perform a computation, the last frequency bin is discarded before we receive it. The author has assumed $X_{filtered}[f=\frac{N}{2}+1] = 0$ in his construction 
+of the analysis and synthesis filterbanks.
 
 Care has been taken in optimizing the GPU code according to the architectural requirements of GPUs: 
 \begin{enumerate}
  \item Memory copies to and from the device is done in batches to improve latency
  \item Memory accesses have been coalesced, including necessary padding to align memory to the 128 byte memory boundaries of Compute Capability 2.0. This constant 
- can be adjusted for later architectures if necessary. At this point we should warn the reader that $N$ must be a multiple of 128 for this coalescing scheme to function
+ can be adjusted for newer architectures if necessary. At this point we should warn the reader that $N$ must be a multiple of 128 for this coalescing scheme to function
  as intended.
- \item Memory transfers to and from the GPU have been optimized by pinning host memory to primary memory so that they do not get paged out to disk by the memory 
+ \item Memory transfers to and from the GPU have been optimized by pinning host memory to primary memory so that it does not get paged out to disk by the memory 
  controller of the host operating system.
- \item DFTs are computed in batches using the NVIDIA CUFFT libraries using the Fast Fourier Transform.
+ \item \gls{dft}s are computed in batches using the NVIDIA CUFFT libraries using \gls{fft}s.
  \item CUDA streams are used to run kernels and memory copies asynchronously whenever possible. This adds an additional level of parallelism to the solution.
- \item We investigated using the cached texture memory to store the prototype \gls{fir} filter coefficients. This did not provide greater throughputs compared to
- coalesced global memory accesses. We note for future reference that it is probably not worthwhile copying these filter taps to constant device memory as this memory only provides
- better throughputs when multiple threads (usually either a half-warp or warp of 32 threads) access the same element simultaneously. This is not true in our situation and
+ \item We investigated using the cached texture memory of the GPU to store the prototype \gls{fir} filter coefficients. This did not provide greater throughputs compared to
+ coalesced global memory accesses. We note for future reference that it is probably not worthwhile copying these filter taps to constant device memory, as this memory only 
+ provides better throughputs when multiple threads (usually either a half-warp or warp of 32 threads) access the same element simultaneously. This is not true in our situation, and
  using constant memory will result in serialization of the entire group of threads!
  \item In compliance with the limitations of compute capability 2.0\footnote{Compute Capability 2.0 accepts a maximum of 65536 blocks per grid dimension} devices we split the 
- number of blocks executed in each grid between the $Dim_x$ and $Dim_y$ dimensions of the grid.
+ number of blocks being executed in each grid between the $Dim_x$ and $Dim_y$ dimensions of the grid.
  \item As it stands the computations of the basic synthesis filter bank did not require the use of shared memory. If kernels are added at a latter stage care should be taken
  to avoid bank-conflicts between warps of threads. The reader is referred to GPU Gems 3 \cite[ch. 3]{harris2007parallel} for a short introduction to this architectural constraint.
 \end{enumerate}
 
 The user should manually tweak the memory allocation to fulfill their needs. All these constants are defined in the header file {\verb inv_pfb.h }. It should be pointed out that 
-the card should be completely filled with data in order to achieve good occupancy and offset relatively slow memory transfers through the PCI express bus.
+the card should be completely filled with data in order to achieve good occupancy and offset the comparatively slow memory transfers through the PCI express bus.
 
 \section{Results and discussion}
 \subsection{Reconstruction quality}
-In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the signal to noise ratio \gls{snr}. Our results 
-confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in the synthesis.
-Although there is a reasonable correlation, which is confirmed by visual inspection of the (time-shifted) output of the synthesis filter bank.
+In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the Signal to Noise Ratio \gls{snr}. Our results 
+confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in synthesis.
+That said, there is a reasonable correlation between the input and the output of the synthesis filter bank. This can be confirmed by visual inspection of the (time-shifted) 
+output of the synthesis filter bank.
 
 The \gls{snr} is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank). Note that
 the initial padding, as outputted by the analysis and synthesis filter banks, are discarded and that an equal number of samples at the end of $y[t]$ are ignored. After this
@@ -313,7 +315,7 @@ clamping operation $x[t]$ and $y[t]$ have equal length.
 \begin{equation}
  SNR(signal[t],noise[t])_{dB}:=10\log_{10}{\frac{\sigma_{signal[t]}^2}{\sigma_{noise[t]}^2}}
 \end{equation}
-We ensured that the correlation and shifting is functioning properly by passing in a tone that is only non-zero over a subinterval. The results are shown in figure~\ref{shift_test}.
+We ensured that the correlation and shifting sections is functioning properly, by passing in a tone that is only non-zero over a subinterval. The results are shown in figure~\ref{shift_test}.
 \begin{figure}[ht!]
   \centering
   \includegraphics[width=0.49\textwidth]{shift_test.png}
@@ -342,7 +344,7 @@ disheartening result.}
 
 \subsection{GPU Computational performance}
 We have recorded performance measurements on a Tesla M2090 and a single core (Python implementation) of a AMD Opteron 6274 clocked at 2200 MHz with 128 GiB primary memory, 
-clocked at 1333 MHz. These timings include memory transfer costs between the host and the GPU. It would be considered an unfair comparison if they are neglected.
+clocked at 1333 MHz. These timings include memory transfer costs between the host and the GPU. It would be considered an unfair comparison if they were neglected.
 \begin{figure}[ht!]
  \centering
  \begin{subfigure}{0.45\textwidth}
@@ -398,22 +400,22 @@ clocked at 1333 MHz. These timings include memory transfer costs between the hos
   \end{tikzpicture}
   \caption{Throughput}
   \end{subfigure} 
-  \caption[GPU performance]{These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
-  file of almost 4 GiB the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, 
+  \caption[GPU performance]{These results indicate that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
+  file, of almost 4 GiB, the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, 
   show that the GPU memory should be saturated with data in order to offset the memory transfer between the host and device.}
   \label{computation_times}
 \end{figure}
 
 Although this speedup seems remarkably good the author wants to caution the reader that, ideally, the optimized GPU version should be compared to an parallel optimized CPU
-version. Not only can we easily parallelize this algorithm using OpenMP, but there is also opportunity here to exploit the full parallel capabilities of modern processors,
-by making use of the special vectorized instruction sets like Intel/AMD Streaming SIMD Extensions or Intel AVX. The latter can perform up to 8 32-bit floating-point
-operations per core simultaneously, by loading 8 elements into a special 256-bit register. This approach, coupled with higher CPU clock speeds may reduce this speedup 
+version. Not only can we easily parallelize this algorithm using OpenMP, but there is also opportunity here to exploit the full parallel capabilities of modern CPUs,
+by making use of the special vectorized instruction sets like Intel/AMD Streaming SIMD Extensions or Intel Adanced Vector eXtensions. The latter can perform up to 8 32-bit 
+floating-point operations per core simultaneously, by loading 8 elements into special 256-bit register at a time. This approach, coupled with higher CPU clock speeds may reduce this speedup 
 significantly if executed on an 8 or 16 core server CPU, and by extension the latest Intel Xeon Phi co-processors.
 
 \section{Future work}
-There is a clear need for an investigation into extending the lengths of the subfilters in order to obtain better reconstructions. The filterbank operation has complexity of 
-$O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also increase in a linear fashion. The author 
-notes that this will require a slight adjustment in both the Python and GPU implementations where the number of FFT bins and subfilter lengths are not assumed to be equal, 
+There is a clear need for an investigation into extending the lengths of the subfilters in order to obtain better a signal reconstruction. The filterbank operation has complexity 
+of $O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also increase in a linear fashion. The author 
+notes that this will require a slight adjustment in both the Python and GPU implementations where the number of \gls{fft} bins and subfilter lengths are not assumed to be equal, 
 as per the basic construction.
 \pagebreak
 \bibliography{inverse_polyphase_filter_bank_report}{}
