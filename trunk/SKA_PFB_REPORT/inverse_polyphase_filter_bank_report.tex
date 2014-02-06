@@ -40,6 +40,10 @@ description={Field Programmable Gate Array}%
 name={DFT},%
 description={Discrete Fourier Transform}%
 }
+\newglossaryentry{fft}{%
+name={FFT},%
+description={Fast Fourier Tranform is a fast algorithm for computing the \gls{dft} using the Cooley–Tukey algorithm amongst others}%
+}
 
 \begin{document}
 \begin{titlepage}
@@ -115,17 +119,17 @@ the technical support he provided during this project.}
 \pagebreak
 \section{Introduction}
 At its core Very Long Baseline Interferometry (\gls{vlbi}) is an interferometry process where the output from several radio antennae are 
-combined to form an equivalent output to a telescope of the size equal to the distance between the furthest two antennae in the \gls{vlbi} array.
+combined, to form an equivalent output to a telescope of the size equal to the distance between the furthest two antennae in the \gls{vlbi} array.
 For a comprehensive overview of the technique the reader is referred to the detailed introduction by Middelberg et al. \cite{middelberg2008high}. Several
 such extended arrays exist including the European VLBI network and the Very Long Baseline Array. The hope is to include the KAT-7 in future VLBI
 observations.
 
 Traditionally the process required raw data to be dumped to a storage medium, say tape and physically shipped to a correlator where the data from several 
 telescopes could be combined. The new trend in VLBI is to perform real-time correlation between antennae using high-speed internet connections and is known
-as 'eVLBI'. Both the Australian Long Baseline Array and the European VLBI network has performed successful eVLBI observations.
+as 'eVLBI'. Both the Australian Long Baseline Array and the European VLBI network have performed successful eVLBI observations.
 
 Ultimately the problem being investigated (at least in part by this report) can be boiled down to converting data sent over the SPEAD protocol (employed 
-internally by the KAT-7 array) to the VDIF format. This conversion process includes a necessary first step where the current sampling rate of 800 MHz
+internally by the KAT-7 array) to the VDIF format. This conversion process includes a necessary first step, where the current sampling rate of 800 MHz
 \footnote{According to the KAT-7 Data Interface document} is reduced to 128 MHz through \textit{Digital Downconversion}. The basic operation involves the following three
 steps:
 \begin{enumerate}
@@ -138,11 +142,11 @@ steps:
  \item Interpolation and Decimation. The reader is referred to \url{http://www.dspguru.com/dsp/faqs/multirate/basics} for an overview of the process.  
 \end{enumerate}
 
-There is, however, a further complication to deal with, before this downconversion process. The KAT-7 beamformer produces a series of frequency spectra\footnote{Each 
-with 1024 channels according to the KAT-7 Data Interface}. If no filtering was applied these spectra the undo operation would only have involved applying the inverse
-Discrete Fourier Transform (\gls{dft}). However, the original voltage data went through a filter-bank operation in a process known as the Polyphase Filter Bank (\gls{pfb}). This
-method is also known as the Weighted Window Overlap method. It is ideal for computing Short Time Discrete Fourier Transforms subsections of very long signals. The reader is 
-referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a detailed description on this technique.
+There is, however, a further complication to deal with, before this downconversion process can begin. The KAT-7 beamformer produces a series of frequency spectra. If no filtering 
+was applied to these spectra, the undo operation would only have involved applying the inverse Discrete Fourier Transform (\gls{dft}). However, the original voltage data went 
+through a filter-bank operation, in a process known as the Polyphase Filter Bank (\gls{pfb}). This method is also known as the Weighted Window Overlap method and is necessary for computing 
+Short Time Discrete Fourier Transforms subsections of very long signals. The reader is referred to \url{https://casper.berkeley.edu/wiki/The_Polyphase_Filter_Bank_Technique} for a detailed 
+description on the forward \gls{pfb}.
 
 \section{Method}
 \subsection{Validation of the forward and inverse processes}
@@ -160,7 +164,7 @@ The key differences between the analysis and synthesis processes are:
 \end{enumerate}
 
 We've implemented both the basic analysis and synthesis filter banks, as well as the necessary tools to analyse the performance of this basic filter bank construction. As shown in 
-figure~\ref{filtered_and_unfiltered_analysis} the analysis filter bank successfully limits leakage of any frequencies that lie between the centers of the bins in of the \gls{dft}.
+figure~\ref{filtered_and_unfiltered_analysis} the analysis filter bank successfully limits leakage of any frequencies that lie between neighbouring bin centers of the \gls{dft}.
 This confirms that our basic analysis filter bank construction is correct.
 \begin{figure}[h]
  \begin{subfigure}{0.5\textwidth}
@@ -177,7 +181,8 @@ This confirms that our basic analysis filter bank construction is correct.
 \end{figure}
 
 The synthesis filter bank construction was tested through cross correlation with the original input signal. A surefire way of determining if there is a 
-correlation between the two processes is to use Gaussian noise as input signal. Perfect Reconstruction (\gls{pr}) requires that the signal only varies in the following two ways:
+correlation between the two intput and output of the sythesis filter bank, is to use Gaussian noise as input signal. Perfect Reconstruction (\gls{pr}) requires that the signal 
+only varies in the following two ways:
 \begin{enumerate}
  \item The output signal may be shifted by some $\Delta$ time steps.
  \item The output signal may be scaled by a constant.
@@ -189,10 +194,10 @@ The signal shift may be found by the following method (where $x[t]$ is the input
 \end{equation}
 
 According to Parishwad Vaidyanathan \cite{vaidyanathan1990multirate} this basic filter bank cannot achieve \gls{pr} and have to be modified in order to do so. This involves 
-modifying both the analysis and synthesis filter banks. In our situation this is not plausible, since the only the basic form of an analysis filter bank is implemented 
-on Field Programmable Gate Arrays (\gls{fpga}) due to their simple construction and fast evaluation times \cite{vaidyanathan1990multirate}. Vaidyanathan goes on to state 
-that the synthesis filter bank requires subfilters of much greater length to obtain reasonably good reconstruction and is therefore computationally prohibiting. That said,
-as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ shows that our basic synthesis filter bank achieves limited reconstruction.
+modifying both the analysis and synthesis filter banks. In our situation this is not plausible, since the only the basic form of analysis filter bank is implemented 
+on Field Programmable Gate Arrays (\gls{fpga}) due to their simple construction and \textit{fast evaluation times} \cite{vaidyanathan1990multirate}. Vaidyanathan goes on to state, 
+however, that the synthesis filter bank requires subfilters of much greater length to obtain reasonably good reconstruction and is therefore computationally prohibiting. That 
+said, as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ shows that our basic synthesis filter bank achieves limited reconstruction.
 
 \begin{figure}
  \begin{subfigure}{0.5\textwidth}
@@ -203,7 +208,7 @@ as the reader can see from figure~\ref{correlation}, $x[t]\star y[t]$ shows that
   \includegraphics[width=0.95\textwidth]{auto_cor.png}
   \caption{Auto correlation of $x[t]$}
  \end{subfigure}
-\caption{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed and input signals is 
+\caption{It is clear that even for Gaussian noise the synthesis filter bank achieves a limited reconstruction - the correlation between the reconstructed- and input signals is 
 about 6 times weaker than the auto correlation of the input signal. The reader should also notice that it appears that $\Delta = -N\dot (P-1)$. This observation was made for 
 trials with input signals of different lengths, but we have not rigorously proven this and it should not be taken as a fact. Future expansion, testing and debugging should use
 the cross correlation to determine $\Delta$.}
@@ -215,7 +220,7 @@ the cross correlation to determine $\Delta$.}
 \subsection{Validation of the GPU version}
 We will for now only focus on the most basic construction to determine what throughput rates can be achieved, as well as the quality of the reconstruction. The full source code
 along with test and analysis suite should be included with this report. With this suite the C++ CUDA GPU code is validated against a serial python implementation. The reader 
-should have GCC 4.6 installed along with the NVIDIA nvcc compiler toolkit 5.0 redistributable. Although the code should work under any platform we have only tested this under 
+should have GCC 4.6 installed, along with the NVIDIA NVCC compiler toolkit 5.0 redistributable. Although the code should work on any platform, we have only tested this under 
 recent GNU/Linux kernels. Another requirement is that the user have a Compute Capability $\geq2.0$ installed on their system. To run the test suite the user should have 
 Python 2.7 along with the SciLab suite of packages installed (including NumPy, SciPy and MatPlotLab).
 
@@ -241,17 +246,17 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
 \end{center}
 
 This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we discarded the last non-redundant
-sample of FFT output. Different FFT implementations may behave differently under this situation and may produce slightly different results. It should be noted
+sample of \gls{fft} output. Different \gls{fft} implementations may behave differently under this situation and may produce slightly different results. It should be noted
 that here the GPU has processed the file in several batches as we will explain next.
 
 \subsection{Optimizations on the GPU-accelerated synthesis filter bank}
 The GPU version has been constructed with the requirements of real-time operation in mind. Although it has not been integrated into a SPEAD receiver, the device simply has
 to be initialized once. The GPU will allocate all the memory it requires during this initialization process. After this initialization step the user can send batches of any size 
 off to the GPU for processing on a rolling bases, as long as one batch is fully processed before the next batch is started. The GPU inverts all the \gls{dft}s in a combined operation  
-and keeps track of the last $P\dot N$ $N$-sized inverse \gls{dft}, by keeping a persistent buffer between batches. The only hard constraint placed on this batching process is that 
+and keeps track of the last $P\times N$ $N$-sized inverse \gls{dft}, by keeping a persistent buffer between batches. The only hard constraint placed on this batching process is that 
 the size of the batch is an integral multiple of $N$ (the length of each analysis spectrum as mentioned earlier). At this point we wish to make the reader aware of subtlety in the 
 output data received from the beamformers. Although a real-valued inverse \gls{dft} will require $\frac{N}{2}+1$ non-redundant samples to perform a computation the last frequency bin 
-is discarded before we receive it. The author has assumed $X_{filtered}[f=1025] = 0$ in his construction of the analysis and synthesis filterbanks.
+is discarded before we receive it. The author has assumed $X_{filtered}[f=\frac{N}{2}+1] = 0$ in his construction of the analysis and synthesis filterbanks.
 
 Care has been taken in optimizing the GPU code according to the architectural requirements of GPUs: 
 \begin{enumerate}
@@ -348,7 +353,9 @@ significantly if executed on an 8 or 16 core server CPU, and by extension the la
 
 \section{Future works}
 The filterbank operation has complexity of $O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also 
-increase in a linear fashion. The next investigation should focus on extending the lengths of the subfilters in order to obtain better reconstructions.
+increase in a linear fashion. The next investigation should focus on extending the lengths of the subfilters in order to obtain better reconstructions. The author notes that
+this will require a slight adjustment in both the Python and GPU implementations where the number of FFT bins and subfilter lengths are not assumed to be equal, as per the basic
+construction.
 \pagebreak
 \bibliography{inverse_polyphase_filter_bank_report}{}
 \bibliographystyle{plain}
