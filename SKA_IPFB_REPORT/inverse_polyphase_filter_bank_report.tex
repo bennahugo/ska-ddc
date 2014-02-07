@@ -109,8 +109,9 @@ Ludwig Schwardt
 %----------------------------------------------------------------------------------------
 %	DATE SECTION
 %----------------------------------------------------------------------------------------
+{\Large REVISION 1}\\[1.0cm] 
+{\large \today}\\[1.5cm] % Date, change the \today to a set date if you want to be precise
 
-{\large \today}\\[2.5cm] % Date, change the \today to a set date if you want to be precise
 {The results obtained in this report were made possible through the use of the ICTS High Performance HEX cluster 
 of the University of Cape Town (UCT) \url{hex.uct.ac.za}. The author wishes to thank Andrew Lewis of UCT ICTS for 
 the technical support he provided during this project.}
@@ -250,7 +251,7 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
     \hline
     $\bar x$ & -0.000307 & -0.000307 \\
     \hline
-    $\sigma^{2}$ & 2.969016 & 2.969015 \\
+    $\sigma$ & 2.969016 & 2.969015 \\
     \hline
     \textbf{Mean Squared Error} & \multicolumn{2}{|c|}{\textbf{0.000001}} \\
     \hline
@@ -297,50 +298,46 @@ the card should be completely filled with data in order to achieve good occupanc
 
 \section{Results and discussion}
 \subsection{Reconstruction quality}
-In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the Signal to Noise Ratio \gls{snr}. Our results 
-confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in synthesis.
-That said, there is a reasonable correlation between the input and the output of the synthesis filter bank. This can be confirmed by visual inspection of the (time-shifted) 
-output of the synthesis filter bank.
+In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the reconstruction factor. Our results 
+corroborates the literature surrounding filterbank construction, but does show that we achieve limited reconstruction. That said, there is a reasonable correlation 
+between the input and the output of the synthesis filter bank. This can be confirmed by visual inspection of the (time-shifted) output of the synthesis filter bank.
 
-The \gls{snr} is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank). Note that
-the initial padding, as outputted by the analysis and synthesis filter banks, are discarded and that an equal number of samples at the end of $y[t]$ are ignored. After this
-clamping operation $x[t]$ and $y[t]$ have equal length.
+The reconstruction factor is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank).
 \begin{enumerate}
- \item Obtain $\Delta$ through $x[t]\star y[t]$. It is assumed that $x[t],y[t]\in\mathbb{R}^n$.
- \item The filter bank introduces a scaling factor to the output. This is canceled by scaling $y[t]$ by $c = \frac{\sigma_{x[t]}^2}{\sigma_{y[t]}^2}$. Additionally the shift 
- introduced by analysis and synthesis is canceled: $y'[t] = c\times y[t-\Delta]$.
- \item Compute the noise: $n[t] := y'[t]-x[t]$
- \item Calculate $SNR(x[t],n[t])$ by the equation given below. The input signal $x[t]$ must have $\bar x\approx 0$. Standard Gaussian noise meets this requirement.
+ \item Assume $y[t]=c(x[t]c_{ax} + n[t]c_{an})$ where $c_{ax}^2+c_{an}^2 = 1$, ie. the reconstructed signal will consist of the scaled sum of scaled input and scaled noise.
+ \item An estimate of $c$ is given by $c^{est}=\frac{\sigma_{y[t]}}{\sigma_{x[t]}}$
+ \item An estimate of $c_{ax}$ is given by $c_{ax}^{est}=\max{(x[t]\star y[t])}\times(c^{est})^{-1}\times(\max{(x[t]\star x[t])})^{-1}$
+ \item The reconstruction ratio is defined as $\frac{\sqrt{2}c_{ax}^{est}}{\sqrt{1+(c_{ax}^{est})^2}}$
 \end{enumerate}
-\begin{equation}
- SNR(signal[t],noise[t])_{dB}:=10\log_{10}{\frac{\sigma_{signal[t]}^2}{\sigma_{noise[t]}^2}}
-\end{equation}
-We ensured that the correlation and shifting sections is functioning properly, by passing in a tone that is only non-zero over a subinterval. The results are shown in figure~\ref{shift_test}.
-\begin{figure}[ht!]
-  \centering
-  \includegraphics[width=0.49\textwidth]{shift_test.png}
-  \caption[Validation of inverse shift for the calculation of the \gls{snr}]{The output tone is shifted to the correct position}
-  \label{shift_test}
-\end{figure}
 
-On 24576 samples the \gls{snr} is equal to 0.063 dB, or equivalently a standard deviation ratio of 1.014. This is a poor reconstruction. Upon further investigation we noticed that
-$\sigma_{signal[t]}^2=27.514$ and $\sigma_{noise[t]}^2=27.117$. This shows that there is a significant amount of noise in the reconstruction. Refer to figure~\ref{snr} for a visual
-inspection of this result.
-\begin{figure}[ht!]
- \centering
- \begin{subfigure}{0.49\textwidth}
-  \includegraphics[width=0.95\textwidth]{overview_snr}
-  \caption{Overview}
- \end{subfigure}
- \begin{subfigure}{0.49\textwidth}
-  \includegraphics[width=0.95\textwidth]{snr_zoomed.png}
-  \caption{Closeup inspection of the input and output}
- \end{subfigure}
-\caption[Reconstruction quality]{As is clearly visible there is a significant amount of noise in the synthesized signal. Although there is clearly a a limited correlation ($x[t]$ and $y[t]$ lines up 
-almost perfectly on some of the peaks), at other positions there is almost no correlation. This explains why the signal to noise ratio is near 0 dB, and is indeed a very
-disheartening result.}
-\label{snr}
-\end{figure}
+Table~\ref{tab_quality} shows that, although the synthesis filterbank has degraded a significant portion of the signal, strong sources will still be observed. Faint
+sources will require a combination of longer observation and/or longer synthesis filters. 
+\begin{table}
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \hline
+    \textbf{Variable} & \textbf{Value}  \\
+    \hline
+    $||x[t]||$ & $81920$ \\
+    \hline
+    $||y[t]||$ & $81920 - 2NP=65536$ \\
+    \hline
+    $\sigma_{x[t]}$ & $25.944$ \\
+    \hline
+    $\sigma_{y[t]}$ & $10.940$ \\
+    \hline
+    $\max{(x[t]\star y[t])}$ & $10 577 811$ \\
+    \hline
+    $\max{(x[t]\star x[t])}$ & $55 151 821$ \\
+    \hline
+    \textbf{Recovery factor} & 0.59\% \\
+    \hline
+    \textbf{Signal degrigation} & -2.32dB \\
+    \hline
+  \end{tabular}
+  \caption[Reconstruction quality]{Reconstruction quality obtained by the basic synthesis bank}
+  \label{tab_quality}
+\end{table}
 
 \subsection{GPU Computational performance}
 We have recorded performance measurements on a Tesla M2090 and a single core (Python implementation) of a AMD Opteron 6274 clocked at 2200 MHz with 128 GiB primary memory, 

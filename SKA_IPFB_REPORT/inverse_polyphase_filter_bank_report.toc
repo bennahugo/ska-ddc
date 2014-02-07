@@ -5,5 +5,5 @@
 \contentsline {subsection}{\numberline {2.3}Optimizations on the GPU-accelerated synthesis filter bank}{7}{subsection.2.3}
 \contentsline {section}{\numberline {3}Results and discussion}{8}{section.3}
 \contentsline {subsection}{\numberline {3.1}Reconstruction quality}{8}{subsection.3.1}
-\contentsline {subsection}{\numberline {3.2}GPU Computational performance}{9}{subsection.3.2}
+\contentsline {subsection}{\numberline {3.2}GPU Computational performance}{8}{subsection.3.2}
 \contentsline {section}{\numberline {4}Future work}{10}{section.4}

@@ -1,6 +1,5 @@
 \glossaryentry{DFT?\glossaryentryfield{dft}{\glsnamefont{DFT}}{Discrete Fourier Transform}{\relax }|setentrycounter[]{page}\glsnumberformat}{1}
 \glossaryentry{DFT?\glossaryentryfield{dft}{\glsnamefont{DFT}}{Discrete Fourier Transform}{\relax }|setentrycounter[]{page}\glsnumberformat}{3}
-\glossaryentry{SNR?\glossaryentryfield{snr}{\glsnamefont{SNR}}{Signal to noise ratio}{\relax }|setentrycounter[]{page}\glsnumberformat}{3}
 \glossaryentry{VLBI?\glossaryentryfield{vlbi}{\glsnamefont{VLBI}}{Very Long Baseline Interferometry}{\relax }|setentrycounter[]{page}\glsnumberformat}{4}
 \glossaryentry{VLBI?\glossaryentryfield{vlbi}{\glsnamefont{VLBI}}{Very Long Baseline Interferometry}{\relax }|setentrycounter[]{page}\glsnumberformat}{4}
 \glossaryentry{lo?\glossaryentryfield{lo}{\glsnamefont{lo}}{Local Oscillator}{\relax }|setentrycounter[]{page}\glsnumberformat}{4}
@@ -28,7 +27,4 @@
 \glossaryentry{DFT?\glossaryentryfield{dft}{\glsnamefont{DFT}}{Discrete Fourier Transform}{\relax }|setentrycounter[]{page}\glsnumberformat}{7}
 \glossaryentry{FFT?\glossaryentryfield{fft}{\glsnamefont{FFT}}{Fast Fourier Tranform is a fast algorithm for computing the \gls {dft} using the Cooley–Tukey algorithm amongst others}{\relax }|setentrycounter[]{page}\glsnumberformat}{7}
 \glossaryentry{FIR?\glossaryentryfield{fir}{\glsnamefont{FIR}}{Finite Impulse Response}{\relax }|setentrycounter[]{page}\glsnumberformat}{8}
-\glossaryentry{SNR?\glossaryentryfield{snr}{\glsnamefont{SNR}}{Signal to noise ratio}{\relax }|setentrycounter[]{page}\glsnumberformat}{8}
-\glossaryentry{SNR?\glossaryentryfield{snr}{\glsnamefont{SNR}}{Signal to noise ratio}{\relax }|setentrycounter[]{page}\glsnumberformat}{8}
-\glossaryentry{SNR?\glossaryentryfield{snr}{\glsnamefont{SNR}}{Signal to noise ratio}{\relax }|setentrycounter[]{page}\glsnumberformat}{9}
 \glossaryentry{FFT?\glossaryentryfield{fft}{\glsnamefont{FFT}}{Fast Fourier Tranform is a fast algorithm for computing the \gls {dft} using the Cooley–Tukey algorithm amongst others}{\relax }|setentrycounter[]{page}\glsnumberformat}{10}
