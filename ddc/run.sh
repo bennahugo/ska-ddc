@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 #
 # This is an example script
 #
 #These commands set up the Grid Environment for your job:
 #PBS -N SKA__DDC
-#PBS -l nodes=1:ppn=16:seriesGPU,walltime=00:01:00
+#PBS -l nodes=srvslsgpu001:ppn=1:seriesGPU,walltime=00:59:00
 #PBS -q GPUQ
 #
 
@@ -18,4 +18,8 @@ echo "Script started at "$(date)
 echo ""
 echo "Running on: $(hostname)"
 echo "-----------------------------------------------------------------------"
-/home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/build/gpu_ddc /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/pytone.dat /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/fir_16m_128tap.dat /home/bhugo/ska-res/ska-ddc/GPUCODE_DDC/output.dump
+exeFile=/home/bhugo/ska-res/ska-ddc/ddc/build/gpu_ddc
+inputSignal=/home/bhugo/ska-res/ska-ddc/ddc/pytone.dat
+filterFile=/home/bhugo/ska-res/ska-ddc/ddc/fir_16m_128tap.dat
+outputFile=/home/bhugo/ska-res/ska-ddc/ddc/gpu_ddc_out.dump
+$exeFile $inputSignal $filterFile $outputFile
