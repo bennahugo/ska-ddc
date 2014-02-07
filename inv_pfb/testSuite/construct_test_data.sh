@@ -22,7 +22,7 @@ echo "-----------------------------------------------------------------------"
 N=1024
 N_longer_filter=$((N*2))
 P=8
-num_samples_to_use=$((N * P * 128000))
+num_samples_to_use=$((N * P * 5))
 output_directory=/scratch/bhugo/data_out
 tone_type=noise
 py_run=/opt/exp_soft/python-2.7.2/bin/python2.7 
