@@ -22,10 +22,6 @@
 		\setentrycounter[]{page}\glsnumberformat{4\delimN 5}}}%
 \glossaryentryfield{pr}{\glsnamefont{PR}}{Perfect Reconstruction}{\relax }{\glossaryentrynumbers{\relax 
 		\setentrycounter[]{page}\glsnumberformat{5\delimN 6}}}\glsgroupskip
-\glsgroupheading{S}\relax \glsresetentrylist %
-\glossaryentryfield{snr}{\glsnamefont{SNR}}{Signal to noise ratio}{\relax }{\glossaryentrynumbers{\relax 
-		\setentrycounter[]{page}\glsnumberformat{3}\delimN 
-		\setentrycounter[]{page}\glsnumberformat{8\delimN 9}}}\glsgroupskip
 \glsgroupheading{V}\relax \glsresetentrylist %
 \glossaryentryfield{vlbi}{\glsnamefont{VLBI}}{Very Long Baseline Interferometry}{\relax }{\glossaryentrynumbers{\relax 
 		\setentrycounter[]{page}\glsnumberformat{4}}}%

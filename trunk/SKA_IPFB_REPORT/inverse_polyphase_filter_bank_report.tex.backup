@@ -109,8 +109,9 @@ Ludwig Schwardt
 %----------------------------------------------------------------------------------------
 %	DATE SECTION
 %----------------------------------------------------------------------------------------
+{\Large REVISION 1}\\[1.0cm] 
+{\large \today}\\[1.5cm] % Date, change the \today to a set date if you want to be precise
 
-{\large \today}\\[2.5cm] % Date, change the \today to a set date if you want to be precise
 {The results obtained in this report were made possible through the use of the ICTS High Performance HEX cluster 
 of the University of Cape Town (UCT) \url{hex.uct.ac.za}. The author wishes to thank Andrew Lewis of UCT ICTS for 
 the technical support he provided during this project.}
@@ -250,7 +251,7 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
     \hline
     $\bar x$ & -0.000307 & -0.000307 \\
     \hline
-    $\sigma^{2}$ & 2.969016 & 2.969015 \\
+    $\sigma$ & 2.969016 & 2.969015 \\
     \hline
     \textbf{Mean Squared Error} & \multicolumn{2}{|c|}{\textbf{0.000001}} \\
     \hline
@@ -265,84 +266,83 @@ It should be noted that here the GPU has processed the file in several batches a
 \subsection{Optimizations on the GPU-accelerated synthesis filter bank}
 The GPU version has been constructed with the requirements of real-time operation in mind. Although it has not been integrated into a SPEAD receiver, the device simply has
 to be initialized once. The GPU will allocate all the memory it requires during this initialization process, after which the user can send batches, of any size, 
-off to the GPU for processing. The user can send these batches on a rolling bases, as long as one batch is fully processed before the next batch is started. The GPU inverts all the \gls{dft}s in a combined operation  
-and keeps track of the last $P\times N$ $N$-sized inverse \gls{dft}, by keeping a persistent buffer between batches. The only hard constraint placed on this batching process is that 
-the size of the batch is an integral multiple of $N$ (the length of each analysis spectrum as mentioned earlier). At this point we wish to make the reader aware of subtlety in the 
-output data received from the beamformers. Although a real-valued inverse \gls{dft} will require $\frac{N}{2}+1$ non-redundant samples to perform a computation the last frequency bin 
-is discarded before we receive it. The author has assumed $X_{filtered}[f=\frac{N}{2}+1] = 0$ in his construction of the analysis and synthesis filterbanks.
+off to the GPU for processing. The user can send these batches on a rolling bases, as long as one batch is fully processed before the next batch is started. The GPU inverts 
+all the \gls{dft}s in a combined operation and keeps track of the last $P\times N$ $N$-sized inverse \gls{dft}s. This is achieved by keeping a persistent buffer between batches. 
+The only hard constraint placed on this batching process is that the size of the batch is an integral multiple of $\frac{N}{2}$ (the length of each analysis spectrum as mentioned earlier). At 
+this point we wish to make the reader aware of subtlety in the output data received from the beamformers. Although a real-valued inverse \gls{dft} will require $\frac{N}{2}+1$ non-redundant 
+samples to perform a computation, the last frequency bin is discarded before we receive it. The author has assumed $X_{filtered}[f=\frac{N}{2}+1] = 0$ in his construction 
+of the analysis and synthesis filterbanks.
 
 Care has been taken in optimizing the GPU code according to the architectural requirements of GPUs: 
 \begin{enumerate}
  \item Memory copies to and from the device is done in batches to improve latency
  \item Memory accesses have been coalesced, including necessary padding to align memory to the 128 byte memory boundaries of Compute Capability 2.0. This constant 
- can be adjusted for later architectures if necessary. At this point we should warn the reader that $N$ must be a multiple of 128 for this coalescing scheme to function
+ can be adjusted for newer architectures if necessary. At this point we should warn the reader that $N$ must be a multiple of 128 for this coalescing scheme to function
  as intended.
- \item Memory transfers to and from the GPU have been optimized by pinning host memory to primary memory so that they do not get paged out to disk by the memory 
+ \item Memory transfers to and from the GPU have been optimized by pinning host memory to primary memory so that it does not get paged out to disk by the memory 
  controller of the host operating system.
- \item DFTs are computed in batches using the NVIDIA CUFFT libraries using the Fast Fourier Transform.
+ \item \gls{dft}s are computed in batches using the NVIDIA CUFFT libraries using \gls{fft}s.
  \item CUDA streams are used to run kernels and memory copies asynchronously whenever possible. This adds an additional level of parallelism to the solution.
- \item We investigated using the cached texture memory to store the prototype \gls{fir} filter coefficients. This did not provide greater throughputs compared to
- coalesced global memory accesses. We note for future reference that it is probably not worthwhile copying these filter taps to constant device memory as this memory only provides
- better throughputs when multiple threads (usually either a half-warp or warp of 32 threads) access the same element simultaneously. This is not true in our situation and
+ \item We investigated using the cached texture memory of the GPU to store the prototype \gls{fir} filter coefficients. This did not provide greater throughputs compared to
+ coalesced global memory accesses. We note for future reference that it is probably not worthwhile copying these filter taps to constant device memory, as this memory only 
+ provides better throughputs when multiple threads (usually either a half-warp or warp of 32 threads) access the same element simultaneously. This is not true in our situation, and
  using constant memory will result in serialization of the entire group of threads!
  \item In compliance with the limitations of compute capability 2.0\footnote{Compute Capability 2.0 accepts a maximum of 65536 blocks per grid dimension} devices we split the 
- number of blocks executed in each grid between the $Dim_x$ and $Dim_y$ dimensions of the grid.
+ number of blocks being executed in each grid between the $Dim_x$ and $Dim_y$ dimensions of the grid.
  \item As it stands the computations of the basic synthesis filter bank did not require the use of shared memory. If kernels are added at a latter stage care should be taken
  to avoid bank-conflicts between warps of threads. The reader is referred to GPU Gems 3 \cite[ch. 3]{harris2007parallel} for a short introduction to this architectural constraint.
 \end{enumerate}
 
 The user should manually tweak the memory allocation to fulfill their needs. All these constants are defined in the header file {\verb inv_pfb.h }. It should be pointed out that 
-the card should be completely filled with data in order to achieve good occupancy and offset relatively slow memory transfers through the PCI express bus.
+the card should be completely filled with data in order to achieve good occupancy and offset the comparatively slow memory transfers through the PCI express bus.
 
 \section{Results and discussion}
 \subsection{Reconstruction quality}
-In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the signal to noise ratio \gls{snr}. Our results 
-confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in the synthesis.
-Although there is a reasonable correlation, which is confirmed by visual inspection of the (time-shifted) output of the synthesis filter bank.
+In order to asses the quality of reconstruction we used Gaussian noise as input to the analysis filter bank and measured the reconstruction factor. Our results 
+confirm our initial fears about the quality of reconstruction: the basic filter bank construction works well for analysis but does not achieve the desired results in synthesis.
+That said, there is a reasonable correlation between the input and the output of the synthesis filter bank. This can be confirmed by visual inspection of the (time-shifted) 
+output of the synthesis filter bank.
 
-The \gls{snr} is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank). Note that
-the initial padding, as outputted by the analysis and synthesis filter banks, are discarded and that an equal number of samples at the end of $y[t]$ are ignored. After this
-clamping operation $x[t]$ and $y[t]$ have equal length.
+The reconstruction factor is calculated in the following manor ($x[t]$ is the input Gaussian noise and $y[t]$ is the output of the synthesis filter bank).
 \begin{enumerate}
- \item Obtain $\Delta$ through $x[t]\star y[t]$. It is assumed that $x[t],y[t]\in\mathbb{R}^n$.
- \item The filter bank introduces a scaling factor to the output. This is canceled by scaling $y[t]$ by $c = \frac{\sigma_{x[t]}^2}{\sigma_{y[t]}^2}$. Additionally the shift 
- introduced by analysis and synthesis is canceled: $y'[t] = c\times y[t-\Delta]$.
- \item Compute the noise: $n[t] := y'[t]-x[t]$
- \item Calculate $SNR(x[t],n[t])$ by the equation given below. The input signal $x[t]$ must have $\bar x\approx 0$. Standard Gaussian noise meets this requirement.
+ \item Assume $y[t]=c(x[t]c_{ax} + n[t]c_{an})$ where $c_{ax}^2+c_{an}^2 = 1$, ie. the reconstructed signal will consist of the scaled sum of scaled input and scaled noise.
+ \item An estimate of $c$ is given by $c^{est}=\frac{\sigma_{y[t]}}{\sigma_{x[t]}}$
+ \item An estimate of $c_{ax}$ is given by $c_{ax}^{est}=\max{x[t]\star y[t]}\times(c^{est})^{-1}\times\max{x[t]\star x[t]}$
+ \item The reconstruction ratio is defined as $\frac{\sqrt{2}c_{ax}^{est}}{\sqrt{1+(c_{ax}^{est})^2}}$
 \end{enumerate}
-\begin{equation}
- SNR(signal[t],noise[t])_{dB}:=10\log_{10}{\frac{\sigma_{signal[t]}^2}{\sigma_{noise[t]}^2}}
-\end{equation}
-We ensured that the correlation and shifting is functioning properly by passing in a tone that is only non-zero over a subinterval. The results are shown in figure~\ref{shift_test}.
-\begin{figure}[ht!]
-  \centering
-  \includegraphics[width=0.49\textwidth]{shift_test.png}
-  \caption[Validation of inverse shift for the calculation of the \gls{snr}]{The output tone is shifted to the correct position}
-  \label{shift_test}
-\end{figure}
 
-On 24576 samples the \gls{snr} is equal to 0.063 dB, or equivalently a standard deviation ratio of 1.014. This is a poor reconstruction. Upon further investigation we noticed that
-$\sigma_{signal[t]}^2=27.514$ and $\sigma_{noise[t]}^2=27.117$. This shows that there is a significant amount of noise in the reconstruction. Refer to figure~\ref{snr} for a visual
-inspection of this result.
-\begin{figure}[ht!]
- \centering
- \begin{subfigure}{0.49\textwidth}
-  \includegraphics[width=0.95\textwidth]{overview_snr}
-  \caption{Overview}
- \end{subfigure}
- \begin{subfigure}{0.49\textwidth}
-  \includegraphics[width=0.95\textwidth]{snr_zoomed.png}
-  \caption{Closeup inspection of the input and output}
- \end{subfigure}
-\caption[Reconstruction quality]{As is clearly visible there is a significant amount of noise in the synthesized signal. Although there is clearly a a limited correlation ($x[t]$ and $y[t]$ lines up 
-almost perfectly on some of the peaks), at other positions there is almost no correlation. This explains why the signal to noise ratio is near 0 dB, and is indeed a very
-disheartening result.}
-\label{snr}
-\end{figure}
+Table~\ref{tab_quality} shows that, although the synthesis filterbank has degraded a significant portion of the signal, strong sources will still be observed. Faint
+sources will require a combination of longer observation and/or longer synthesis filters. 
+\begin{table}
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \hline
+    \textbf{Variable} & \textbf{Value}  \\
+    \hline
+    $||x[t]||$ & $81920$ \\
+    \hline
+    $||y[t]||$ & $81920 - 2NP=65536$ \\
+    \hline
+    $\sigma_{x[t]}$ & $25.944$ \\
+    \hline
+    $\sigma_{y[t]}$ & $10.940$ \\
+    \hline
+    $\max{x[t]\star y[t]}$ & $10 577 811$ \\
+    \hline
+    $\max{x[t]\star x[t]}$ & $55 151 821$ \\
+    \hline
+    \textbf{Recovery factor} & 0.59\% \\
+    \hline
+    \textbf{Signal degrigation} & -2.32dB \\
+    \hline
+  \end{tabular}
+  \caption[Reconstruction quality]{Reconstruction quality obtained by the basic synthesis bank}
+  \label{tab_quality}
+\end{table}
 
 \subsection{GPU Computational performance}
 We have recorded performance measurements on a Tesla M2090 and a single core (Python implementation) of a AMD Opteron 6274 clocked at 2200 MHz with 128 GiB primary memory, 
-clocked at 1333 MHz. These timings include memory transfer costs between the host and the GPU. It would be considered an unfair comparison if they are neglected.
+clocked at 1333 MHz. These timings include memory transfer costs between the host and the GPU. It would be considered an unfair comparison if they were neglected.
 \begin{figure}[ht!]
  \centering
  \begin{subfigure}{0.45\textwidth}
@@ -398,22 +398,22 @@ clocked at 1333 MHz. These timings include memory transfer costs between the hos
   \end{tikzpicture}
   \caption{Throughput}
   \end{subfigure} 
-  \caption[GPU performance]{These results indicates that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
-  file of almost 4 GiB the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, 
+  \caption[GPU performance]{These results indicate that the GPU significantly outperforms its serial counterpart. Additionally, when the GPU version is executed on a much larger
+  file, of almost 4 GiB, the throughput increases to 8.20 Gbps - more than a 273x speedup! These rates well exceeds the requirements for real-time synthesis. It does, however, 
   show that the GPU memory should be saturated with data in order to offset the memory transfer between the host and device.}
   \label{computation_times}
 \end{figure}
 
 Although this speedup seems remarkably good the author wants to caution the reader that, ideally, the optimized GPU version should be compared to an parallel optimized CPU
-version. Not only can we easily parallelize this algorithm using OpenMP, but there is also opportunity here to exploit the full parallel capabilities of modern processors,
-by making use of the special vectorized instruction sets like Intel/AMD Streaming SIMD Extensions or Intel AVX. The latter can perform up to 8 32-bit floating-point
-operations per core simultaneously, by loading 8 elements into a special 256-bit register. This approach, coupled with higher CPU clock speeds may reduce this speedup 
+version. Not only can we easily parallelize this algorithm using OpenMP, but there is also opportunity here to exploit the full parallel capabilities of modern CPUs,
+by making use of the special vectorized instruction sets like Intel/AMD Streaming SIMD Extensions or Intel Adanced Vector eXtensions. The latter can perform up to 8 32-bit 
+floating-point operations per core simultaneously, by loading 8 elements into special 256-bit register at a time. This approach, coupled with higher CPU clock speeds may reduce this speedup 
 significantly if executed on an 8 or 16 core server CPU, and by extension the latest Intel Xeon Phi co-processors.
 
 \section{Future work}
-There is a clear need for an investigation into extending the lengths of the subfilters in order to obtain better reconstructions. The filterbank operation has complexity of 
-$O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also increase in a linear fashion. The author 
-notes that this will require a slight adjustment in both the Python and GPU implementations where the number of FFT bins and subfilter lengths are not assumed to be equal, 
+There is a clear need for an investigation into extending the lengths of the subfilters in order to obtain better a signal reconstruction. The filterbank operation has complexity 
+of $O(n)$. Therefore it is reasonable to assume that if the subfilters are expanded by a constant factor the computation time will also increase in a linear fashion. The author 
+notes that this will require a slight adjustment in both the Python and GPU implementations where the number of \gls{fft} bins and subfilter lengths are not assumed to be equal, 
 as per the basic construction.
 \pagebreak
 \bibliography{inverse_polyphase_filter_bank_report}{}
