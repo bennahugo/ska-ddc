@@ -69,7 +69,7 @@ description={Signal to noise ratio}%
 %	HEADING SECTIONS
 %----------------------------------------------------------------------------------------
 
-\textsc{\LARGE Square Kilometer Array South Africa}\\[1.5cm]
+\textsc{\LARGE Square Kilometre Array South Africa}\\[1.5cm]
 \textsc{\Large Internship technical report}\\[0.5cm]
 
 %----------------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ description={Signal to noise ratio}%
 %----------------------------------------------------------------------------------------
 
 \HRule \\[0.4cm]
-{ \huge \bfseries GPU-accelerated Inverse Polyphase Filterbank}\\[0.4cm]
+{ \huge \bfseries GPU-accelerated Inverse Polyphase Filter bank}\\[0.4cm]
 \HRule \\[1.5cm]
  
 %----------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ Ludwig Schwardt
 %----------------------------------------------------------------------------------------
 %	DATE SECTION
 %----------------------------------------------------------------------------------------
-{\Large REVISION 1}\\[1.0cm] 
+{\Large REVISION 2}\\[1.0cm] 
 {\large \today}\\[1.5cm] % Date, change the \today to a set date if you want to be precise
 
 {The results obtained in this report were made possible through the use of the ICTS High Performance HEX cluster 
@@ -242,7 +242,7 @@ is defined as:
  MSE(input_1,input_2) := \frac{\sum_{k=0}^{L-1}{(input_1[k] - input_2[k])^2}}{L} \text{ where } ||input_1|| = ||input_2|| = L
 \end{equation}
 
-By generating 0.976 GiB of Gaussian noise we determined these following characteristics for the two output files:
+By generating 0.976 GiB of Gaussian noise we determined the characteristics of the two output files, as shown in table~\ref{validation_gpu}
 \begin{table}
   \centering
   \begin{tabular}{|c|c|c|}
@@ -257,6 +257,7 @@ By generating 0.976 GiB of Gaussian noise we determined these following characte
     \hline
   \end{tabular}
   \caption[Validation of the GPU version]{Results from validating the GPU version against the serial python version of the synthesis filter bank}
+  \label{validation_gpu}
 \end{table}
 
 This subtle difference between the output files may be attributed to both floating-point rounding errors and the fact that we have discarded the last non-redundant
